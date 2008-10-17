@@ -1,0 +1,5 @@
+; $Id: user_relationshipsactivity.info,v 1.1.2.1 2007/12/23 18:58:02 robertDouglass Exp $
+name = User relationships activity
+description = Enable activity notifications for user relationships.
+dependencies = activity user_relationships
+package = Activity

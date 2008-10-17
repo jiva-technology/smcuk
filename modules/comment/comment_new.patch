@@ -1,0 +1,62 @@
+=== modified file 'modules/comment/comment.module'
+--- modules/comment/comment.module	2007-12-28 12:02:49 +0000
++++ modules/comment/comment.module	2008-01-02 07:28:34 +0000
+@@ -805,6 +805,7 @@ function comment_save($edit) {
+  */
+ function comment_links($comment, $return = 1) {
+   global $user;
++  static $page;
+ 
+   $links = array();
+ 
+@@ -817,6 +818,19 @@ function comment_links($comment, $return
+     );
+   }
+ 
++  if (isset($comment->next)) {
++    if (!isset($page)) {
++      $node = $comment->node;
++      $page = comment_new_page_count($node->comment_count, 1, $node);
++    }
++    $links['comment_next'] = array(
++      'title' => t('Next new'),
++      'href' => 'node/'. $node->nid,
++      'query' => $page,
++      'fragment' => 'comment-'. $comment->next,
++    );
++  }
++
+   if (node_comment_mode($comment->nid) == COMMENT_NODE_READ_WRITE) {
+     if (user_access('administer comments') && user_access('post comments')) {
+       $links['comment_delete'] = array(
+@@ -996,7 +1010,17 @@ function comment_render($node, $cid = 0)
+         $comment = drupal_unpack($comment);
+         $comment->name = $comment->uid ? $comment->registered_name : $comment->name;
+         $comment->depth = count(explode('.', $comment->thread)) - 1;
+-
++        $comment->new = node_mark($comment->nid, $comment->timestamp);
++        $comment->node = $node;
++        if ($comment->new != MARK_READ) {
++          if (isset($old)) {
++            $comments_array[$old]->next = $comment->cid;
++          }
++          $old = $comment->cid;
++        }
++        $comments_array[$comment->cid] = $comment;
++      }
++      foreach ($comments_array as $comment) {
+         if ($mode == COMMENT_MODE_THREADED_COLLAPSED || $mode == COMMENT_MODE_THREADED_EXPANDED) {
+           if ($comment->depth > $divs) {
+             $divs++;
+@@ -1559,7 +1583,9 @@ function theme_comment_view($comment, $n
+   static $first_new = TRUE;
+ 
+   $output = '';
+-  $comment->new = node_mark($comment->nid, $comment->timestamp);
++  if (!isset($comment->new)) {
++    $comment->new = node_mark($comment->nid, $comment->timestamp);
++  }
+   if ($first_new && $comment->new != MARK_READ) {
+     // Assign the anchor only for the first new comment. This avoids duplicate
+     // id attributes on a page.
+

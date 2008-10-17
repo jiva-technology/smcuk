@@ -1,0 +1,44 @@
+<?php
+// $Id
+/**
+ * @file
+ * Installation for seesmic_api module
+ *
+ * @author Sergey Bozhko & Maxime Topolov(www.adyax.com)
+ */
+
+/**
+ * Implementation of hook_install
+ *
+ */
+function seesmic_api_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("CREATE TABLE {seesmic_videos} (
+                dsvid INT(10)   UNSIGNED NOT NULL PRIMARY KEY,
+                seesmic_video_id VARCHAR(255) NOT NULL,
+                uid INT UNSIGNED NOT NULL,
+                created INT UNSIGNED NOT NULL,
+                KEY uid (uid)
+                ) /*!40100 DEFAULT CHARACTER SET utf8 */;");
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_uninstall
+ *
+ */
+function seesmic_api_uninstall() {
+  db_query('DROP TABLE {seesmic_videos}');
+}
+
+/**
+ * Implementation of hook_updateN
+ *
+ */
+function seesmic_api_update_1() {
+	db_query('ALTER TABLE {seesmic_videos} ADD `thumb_url` TEXT NOT NULL ;');
+  return array();
+}

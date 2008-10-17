@@ -1,0 +1,72 @@
+<?php
+// $Id: category_menu.install,v 1.3 2006/11/06 05:46:35 jaza Exp $
+
+/**
+ * @file
+ * Update file for the category_menu module. All functions in this
+ * file are implementations of hook_update_N(), unless indicated otherwise.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function category_menu_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("CREATE TABLE {category_menu} (
+        cid int(10) unsigned NOT NULL default '0',
+        item_for_cats tinyint(3) unsigned NOT NULL default '0',
+        item_for_nodes tinyint(3) unsigned NOT NULL default '0',
+        PRIMARY KEY (cid)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */
+      ");
+      db_query("CREATE TABLE {category_menu_map} (
+        nid int(10) unsigned NOT NULL default '0',
+        mid int(10) unsigned NOT NULL default '0',
+        PRIMARY KEY (nid,mid),
+        KEY mid_nid (mid,nid)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */
+      ");
+      break;
+    case 'pgsql':
+      db_query("CREATE TABLE {category_menu} (
+        cid integer NOT NULL default '0',
+        item_for_cats smallint NOT NULL default '0',
+        item_for_nodes smallint NOT NULL default '0',
+        PRIMARY KEY (cid)
+      )");
+      db_query("CREATE TABLE {category_menu_map} (
+        nid integer NOT NULL default '0',
+        mid integer NOT NULL default '0',
+        PRIMARY KEY (nid,mid)
+      )");
+      db_query("CREATE INDEX {category_menu_map}_mid_nid_idx ON {category_menu_map}(mid,nid)");
+      break;
+  }
+}
+
+function category_menu_update_1() {
+  // Allows multiple entries on a node to work.
+  $ret = array();
+
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      // New indexing structure.
+      $ret[] = update_sql('ALTER TABLE {category_menu_map} DROP INDEX mid');
+      $ret[] = update_sql('ALTER TABLE {category_menu_map} DROP PRIMARY KEY');
+      $ret[] = update_sql('ALTER TABLE {category_menu_map} ADD PRIMARY KEY (nid,mid)');
+      $ret[] = update_sql('ALTER TABLE {category_menu_map} ADD KEY mid_nid (mid,nid)');
+      break;
+    case 'pgsql':
+      // New indexing structure.
+      $ret[] = update_sql('ALTER TABLE {category_menu_map} DROP CONSTRAINT {category_menu_map}_mid_idx');
+      $ret[] = update_sql('ALTER TABLE {category_menu_map} DROP CONSTRAINT {category_menu_map}_pkey');
+      $ret[] = update_sql('ALTER TABLE {category_menu_map} ADD PRIMARY KEY (nid,mid)');
+      $ret[] = update_sql('CREATE INDEX {category_menu_map}_mid_nid_idx ON {category_menu_map}(mid,nid)');
+      break;
+  }
+
+  return $ret;
+}

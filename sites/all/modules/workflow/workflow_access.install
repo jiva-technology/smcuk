@@ -1,0 +1,55 @@
+<?php
+// $Id: workflow_access.install,v 1.1.2.3 2008/04/16 22:35:26 jvandyk Exp $
+
+/**
+ * Implementation of hook_install().
+ */
+function workflow_access_install() {
+  $result = array();
+
+  switch ($GLOBALS['db_type']) {
+    case 'mysqli':
+    case 'mysql':
+      $result[] = db_query(
+<<<QUERY
+CREATE TABLE {workflow_access} (
+  sid int(10) NOT NULL default 0,
+  rid int(10) NOT NULL default 0,
+  grant_view tinyint(1) unsigned NOT NULL default 0,
+  grant_update tinyint(1) unsigned NOT NULL default 0,
+  grant_delete tinyint(1) unsigned NOT NULL default 0,
+  KEY sid (sid),
+  KEY rid (rid)
+) /*!40100 DEFAULT CHARACTER SET utf8 */;
+QUERY
+      );
+      break;
+
+    case 'pgsql':
+      $result[] = db_query(
+<<<QUERY
+CREATE TABLE {workflow_access} (
+  sid SERIAL,
+  rid integer NOT NULL default 0,
+  grant_view smallint unsigned NOT NULL default 0,
+  grant_update smallint unsigned NOT NULL default 0,
+  grant_delete smallint unsigned NOT NULL default 0,
+);
+QUERY
+      );
+      $result[] = db_query(
+<<<QUERY
+CREATE INDEX {workflow_access}_rid_idx ON {workflow_access}(rid);
+QUERY
+      );
+  }
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function workflow_access_uninstall() {
+  db_query('DROP TABLE {workflow_access}');
+  // Purge records from the node access table.
+  node_access_rebuild();
+}

@@ -1,0 +1,101 @@
+# LANGUAGE translation of Drupal (category_menu.module)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from file: category_menu.module,v 1.25 2006/03/04 11:42:19 jaza
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"POT-Creation-Date: 2006-03-14 02:21-0600\n"
+"PO-Revision-Date: YYYY-mm-DD HH:MM+ZZZZ\n"
+"Last-Translator: NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <EMAIL@ADDRESS>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: category_menu.module:15
+msgid "Creates and manages a set of menu items that correspond to your site's category hierarchy. Requires the category module."
+msgstr ""
+
+#: category_menu.module:17
+msgid "<p>The category menu module creates and manages a set of menu items that correspond to your site's category hierarchy. These menu items are static rather than dynamic, so that you can add other menu items (such as module index pages) as children using the menu module. Breadcrumbs for category and container pages (and, optionally, assigned node pages) will reflect the managed menu items. You can also display the menu as a block on your site.</p><p>This module requires the category module.</p>"
+msgstr ""
+
+#: category_menu.module:44;50
+msgid "Add to category outline"
+msgstr ""
+
+#: category_menu.module:45;53
+msgid "Update category outline"
+msgstr ""
+
+#: category_menu.module:46;56
+msgid "Remove from category outline"
+msgstr ""
+
+#: category_menu.module:85
+msgid "Menu item settings"
+msgstr ""
+
+#: category_menu.module:91
+msgid "Default menu"
+msgstr ""
+
+#: category_menu.module:94
+msgid "The menu in which menu items for categories and containers will be populated and managed. This can be the default <em>Navigation</em> menu, or another (custom) menu."
+msgstr ""
+
+#: category_menu.module:103;142
+msgid "Category menu items"
+msgstr ""
+
+#: category_menu.module:106
+msgid "For categories and containers, these settings only affect new nodes; update operations are performed if a menu item already exists for a particular category or container, regardless of these settings. For assigned nodes, these settings affect new and existing nodes. For categories and containers, if the parent of the node being created does not have a menu item, then the system will traverse all ancestors (of lightest weight) in the category tree, until one with a menu item is found, or until the top of the tree is reached."
+msgstr ""
+
+#: category_menu.module:109;147
+msgid "Disabled"
+msgstr ""
+
+#: category_menu.module:110;148
+msgid "Enabled"
+msgstr ""
+
+#: category_menu.module:111;149
+msgid "Enabled (but disable each item)"
+msgstr ""
+
+#: category_menu.module:115
+msgid "Menu items within this container"
+msgstr ""
+
+#: category_menu.module:117;154
+msgid "Enabled (and display each item expanded)"
+msgstr ""
+
+#: category_menu.module:118
+msgid "If enabled, menu items are automatically created and maintained for child categories. If set to 'enabled (but disable each item)', then menu links will not be visible, but breadcrumbs will be. If this container has its 'hidden' attribute <em>disabled</em>, a menu item is also created and maintained for the container itself. In this context, a child category is one that belongs to this container, even if it has another container as its distant parent. If a category has multiple parents, then it will be placed underneath the parent with the <strong>lightest weight</strong> as a menu item."
+msgstr ""
+
+#: category_menu.module:122;159
+msgid "Menu items for assigned nodes"
+msgstr ""
+
+#: category_menu.module:125;161
+msgid "If enabled, menu items are automatically created and maintained for nodes assigned under one or more child categories. If set to 'enabled (but disable each item)', then menu links will not be visible, but breadcrumbs will be. Nodes will be placed underneath whatever category is of the <strong>lightest weight</strong>."
+msgstr ""
+
+#: category_menu.module:153
+msgid "Menu items within selected containers"
+msgstr ""
+
+#: category_menu.module:155
+msgid "If enabled, menu items are automatically created and maintained for child categories. If set to 'enabled (but disable each item)', then menu links will not be visible, but breadcrumbs will be. If the selected containers have their 'hidden' attribute <em>disabled</em>, a menu item is also created and maintained for the containers themselves. In this context, a child category is one that belongs to a selected container, even if it has another container as its distant parent. If a category has multiple parents, then it will be placed underneath the parent with the <strong>lightest weight</strong> as a menu item."
+msgstr ""
+
+#: category_menu.module:0
+msgid "category_menu"
+msgstr ""
+

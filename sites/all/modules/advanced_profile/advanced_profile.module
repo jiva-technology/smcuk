@@ -1,0 +1,475 @@
+<?php
+// $Id: advanced_profile.module,v 1.15 2008/06/30 19:42:50 michellec Exp $
+
+/*** HOOKS *******************************************************************/
+
+/**
+ * Implementation of hook_perm().
+ */
+function advanced_profile_perm() {
+  return array('administer advanced profile');
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function advanced_profile_menu($may_cache) {
+  $items = array();
+  if ($may_cache) {
+    // Add menu entry for settings page
+    $items[] = array(
+        'path' => "admin/settings/advanced-profile",
+        'title' => t('Advanced Profile'),
+        'callback' => 'drupal_get_form',
+        'callback arguments' => array('advanced_profile_settings_page'),
+        'access' => user_access('administer advanced profile'),
+    );
+  } 
+  else {
+    if (arg(0) == 'user') {
+      // Find the CSS file for the profiles by looking first in the theme 
+      // and then in the module.
+      $css_file = path_to_theme() . '/advanced_profile.css';
+      
+      if (!file_exists($css_file)) {
+        $css_file = drupal_get_path('module', 'advanced_profile') . '/advprofile/advanced_profile.css';
+      }
+
+      drupal_add_css($css_file);
+    }
+  }
+  return $items;
+}
+
+/*** SETTINGS ****************************************************************/
+
+/**
+ * Define settings form
+ */
+function advanced_profile_settings_page() {
+  $message = "This page is empty because no settings apply with your current configuration.";
+
+  // This option is only needed for nodeprofile as bio handles it already
+  if (module_exists('nodeprofile_helper')) {
+    $message = '';
+    $types = nodeprofile_get_types('types');
+    $options = array();
+    foreach ($types as $type) {
+      $options[$type->type] = $type->name;
+    }
+
+    $form['advanced_profile_typenames'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Select types to add edit tabs for'),
+      '#options' => $options,
+      '#description' => t('Each type selected here gets an edit tab on the user page'),
+      '#default_value' => variable_get('advanced_profile_typenames',''),
+    );
+  }
+
+  // Check if uprofile type exists
+  $uprofile_exists = db_result(db_query("select  count(type) from {node_type} where type='%s'", 'uprofile'));
+
+  if (!$uprofile_exists) {
+    $message = '';
+
+    // Auto create uprofile type option
+    $form['advanced_profile_nodetypesetup'] = array(
+      '#type' => 'checkboxes',
+      '#title' => t('Profile type auto creation'),
+      '#options' => array(
+        'Create' => t('Create the user profile node type with included fields'),
+        ),
+      '#description' => t("If you'd like to auto create the node type for user profiles, check this. The option will not appear once you have a uprofile node type."),
+    );
+
+    // Create the uprofile content type if requested by the user checking the box
+    $node_type_setup = variable_get('advanced_profile_nodetypesetup',0);
+    if ($node_type_setup['Create']) {
+      $cck_definition_file = drupal_get_path('module', 'advanced_profile') . '/includes/uprofile.inc';
+      _create_content_type($cck_definition_file);
+    }
+
+    // Dump the checkbox vars to make sure we don't try to run this more than once
+    variable_del('advanced_profile_nodetypesetup');
+  }
+
+  if (!empty($message)) {
+    drupal_set_message($message);
+  }
+
+  // Send our form to Drupal to make a settings page
+  return system_settings_form($form);
+}
+
+/**
+ * Helper function to import a CCK content type definition from a text file.
+ * Thanks Wim Leers
+ *
+ * @param $cck_definition_file
+ *   The full path to the file containing the CCK definition.
+ */
+function _create_content_type($cck_definition_file) {
+  include_once('./'. drupal_get_path('module', 'node') .'/content_types.inc');
+  include_once('./'. drupal_get_path('module', 'content') .'/content_admin.inc');
+  $values = array();
+  $values['type_name'] = '<create>';
+  $values['macro'] = file_get_contents($cck_definition_file);
+  drupal_execute("content_copy_import_form", $values);
+}
+
+/*** TEMPLATE PREPROCESS *****************************************************/
+
+/**
+ * D5 compatability wrapper for node/comment preprocess functions.
+ * Called from _phptemplate_variables() in template.php
+ */
+function advanced_profile_addvars($hook, $vars) {
+  if ($hook == 'page' && arg(0) == 'user') {
+    // Change the "Edit" tab to "Edit Account" for clarity
+    $vars['tabs'] = str_replace('Edit</a>', 'Edit Account</a>', $vars['tabs']);
+  }
+
+  return $vars;
+}
+
+/**
+ * D5 compatability wrapper for profile user preprocess function.
+ */
+function theme_advprofile_userinfo($account) {
+  // Should never happen but just in case the ID is passed instead of the object
+  if (is_numeric($account)) {
+    $account = user_load(array('uid' => $account));
+  }
+
+  $vars = array();
+  $vars['account'] = $account;
+  $vars['accountid'] = $account->uid;
+
+  template_preprocess_advprofile_userinfo($vars);
+
+  if (file_exists(path_to_theme() . "/advanced_profile_userinfo.tpl.php")) {
+    return _phptemplate_callback("advanced_profile_userinfo", $vars);
+  } else {
+    //No .tpl file so output some basic formatting.
+    $output = '<div class="user-info">';
+    $output .= $vars['user_title'];
+    $output .= $vars['posts'];
+    $output .= $vars['joined'];
+    $output .= $vars['points'];
+    $output .= $vars['user_badges'];
+    $output .= $vars['online_status'];
+    $output .= $vars['contact'];
+    $output .= $vars['privatemsg'];
+    $output .= $vars['buddylist'];
+    $output .= '</div>';
+
+    return $output;
+  }
+}
+
+function template_preprocess_advprofile_userinfo(&$variables) {
+  // The passed in $variables['account'] refers to the user who's info is in the pane.
+  $account = $variables['account'];
+  $account_id = $variables['accountid'];
+
+  // Get a reference to the currently logged in user.
+  global $user;
+
+  // Username
+  $variables['name_raw'] =  theme('username', $account);
+  $variables['name'] =  '<div class="username">' .$variables['name_raw'] . '</div>';
+
+  // Avatar
+  $variables['picture'] = theme('user_picture', $account);
+
+  $icon_directory =  drupal_get_path('module', 'advanced_profile') . '/advprofile/images';
+
+  // Join date / since
+  $variables['joined_raw'] = format_date($account->created, 'custom', 'Y-m-d');
+  $variables['joined'] = '<div class="account-joined"><strong>' . t('Joined: ') . '</strong>' . $variables['joined_raw'] . '</div>';
+
+  $variables['member_since_raw'] = format_interval(time() - $account->created);
+  $variables['member_since'] = '<div class="account-member-since">' . t('Member since: ') . $variables['member_since_raw'] . '</div>';
+
+  // Online status
+  if (round((time()-$account->access)/60) < 15) {
+    $variables['online_class'] = 'user-online';
+    $variables['online_icon'] = theme_image($icon_directory . '/status_online.png', 'User is online', 'User is online', NULL, TRUE);
+    $variables['online_text'] = t('Online');
+    $variables['online_status'] = '<div class="user-online">' . $variables['online_icon'] . ' ' . $variables['online_text'] . '</div>';
+  } else {
+    $variables['online_class'] = 'user-offline';
+    $variables['online_icon'] = theme_image($icon_directory . '/status_offline.png', 'User is offline', 'User is offline', NULL, TRUE);
+    $variables['online_text'] = t('Offline');
+    $variables['online_status'] = '<div class="user-offline">' . $variables['online_icon'] . ' ' . $variables['online_text'] . '</div>';
+  }
+
+  // Profile
+  if (module_exists('profile')) {
+    $variables['profile'] = profile_view_profile($account);
+  }
+
+  // Points
+  if (module_exists('userpoints')) {
+    $variables['points_raw'] = userpoints_get_current_points($account_id);
+    $variables['points'] = '<div class="user-points"><strong>' . t('Points: ') . '</strong>' . $variables['points_raw'] . '</div>';
+  }
+
+  // Posts / IP
+  if (module_exists('user_stats')) {
+    $variables['posts_raw'] = user_stats_get_stats('post_count',$account_id);
+    $variables['posts'] = '<div class="user-posts"><strong>' . t('Posts: ') . '</strong>' . $variables['posts_raw'] . '</div>';
+
+    // IP is only visible if the viewer has access, so do an extra check
+    $ip = user_stats_get_stats('ip_address', $account_id);
+    if (!empty($ip)) {
+      $variables['ip_raw'] = $ip;
+      $variables['ip'] = '<div class="user-ip"><strong>' . t('IP: ') . '</strong>' . $variables['ip_raw'] . '</div>';
+    }
+  }
+
+  // Title
+  if (module_exists('user_titles')) {
+    $variables['user_title_raw'] = user_titles_get_user_title($account_id);
+    $variables['user_title'] = '<div class="user-title">' . $variables['user_title_raw'] . '</div>';
+  }
+
+  // Badges
+  if (module_exists('user_badges')) {
+    $variables['user_badges_raw'] = user_badges_for_uid($account_id);
+    $variables['user_badges'] = '<div class="user-badges">' . $variables['user_badges_raw'] . '</div>';
+  }
+
+  // Contact user
+  // If the profile user has the contact form turned on, and the viewer is not 
+  // the profile owner, and the viewer is not anonymous, show the link
+  if (($account->contact) && ($account->uid != $user->uid) && ($user->uid != 0)) {
+    $variables['contact_class'] = "contact";
+    $variables['contact_icon'] = theme_image($icon_directory . "/email.png", 'Email', 'Email', NULL, TRUE);
+    $variables['contact_text'] = t('Email');
+    $variables['contact_link'] = 'user/'. $account_id . '/contact';
+    $variables['contact'] = '<div class="contact">' .
+                          l($variables['contact_icon'] . ' '  . $variables['contact_text'], $variables['contact_link'],NULL,NULL,NULL,NULL,TRUE) .
+                          '</div>';
+  }
+
+  // Send private message
+  if (module_exists('privatemsg') &&
+     ($account->uid != $user->uid) &&
+     user_access('access private messages') &&
+     (isset($account->privatemsg_allow) ? $account->privatemsg_allow : 1)) {
+    $variables['privatemsg_icon'] = theme_image($icon_directory . "/user_comment.png", 'Private Message', 'Private Message', NULL, TRUE);
+    $variables['privatemsg_text'] = t('Send PM');
+    $variables['privatemsg_link'] = 'privatemsg/new/'. $account_id;
+    $variables['privatemsg'] = '<div class="privatemsg">' .
+      l($variables['privatemsg_icon'] . ' '  .
+      $variables['privatemsg_text'], $variables['privatemsg_link'], NULL, NULL, NULL, NULL, TRUE) . '</div>';
+  }
+
+  // Add / remove from buddylist
+  if (module_exists('buddylist')) {
+    if (user_access('maintain buddy list') && @in_array($account_id, array_keys(buddylist_get_buddies($user->uid)))) {
+      // Remove buddy
+      $variables['buddylist_class'] = "buddy-remove";
+      $variables['buddylist_icon'] = theme_image($icon_directory . "/group_delete.png", 'Remove Buddy', 'Remove Buddy', NULL, TRUE);
+      $variables['buddylist_text'] = t('Remove buddy');
+      $variables['buddylist_link'] = 'buddy/delete/'. $account_id;
+    } else {
+      // Add buddy
+      if ($account_id != $user->uid && user_access('maintain buddy list')) {
+        $variables['buddylist_class'] = "buddy-add";
+        $variables['buddylist_icon'] = theme_image($icon_directory . "/group_add.png", 'Add to buddy list', 'Add to buddy list', NULL, TRUE);
+        $variables['buddylist_text'] = t('Add buddy');
+        $variables['buddylist_link'] = 'buddy/add/'. $account_id;
+      }
+    }
+
+    $variables['buddylist'] = '<div class="' . $variables['buddylist_class'] . '">' .
+      l($variables['buddylist_icon'] . ' '  . $variables['buddylist_text'], $variables['buddylist_link'], NULL, NULL, NULL, NULL, TRUE) . '</div>';
+  }
+
+ }
+
+
+/*** PANELS ******************************************************************/
+
+/**
+ * Implementation of hook_panels_content_types
+ */
+function advanced_profile_panels_content_types() {
+  $items['userinfo'] = array(
+    'title' => t('User Info'),
+    'title callback' => 'advanced_profile_title_userinfo',
+    'content_types' => 'advanced_profile_userinfo_content_type',
+    'single' => TRUE,
+    'render callback' => 'advanced_profile_userinfo_content',
+  );
+
+  $items['mydodges'] = array(
+    'title' => t('My Dodges'),
+    'content_types' => 'advanced_profile_mydodges_content_type',
+    'single' => TRUE,
+    'render callback' => 'advanced_profile_mydodges_content',
+  );
+
+  return $items;
+}
+
+/**
+ * Return "user info" content type.
+ */
+function advanced_profile_userinfo_content_type() {
+  return array(
+    'description' => array(
+      'title' => t('User Info'),
+      'icon' => 'icon_user.png',
+      'path' => panels_get_path('content_types/user'),
+      'description' => t('User information gathered from helper modules.'),
+      'required context' => new panels_required_context(t('User'), 'user'),
+      'category' => array(t('User context'), -9),
+    ),
+  );
+}
+
+/**
+ * Output function for the 'user info' content type.
+ */
+function advanced_profile_userinfo_content($conf, $panel_args, $context) {
+  $account = isset($context->data) ? drupal_clone($context->data) : NULL;
+  $block->module = 'userinfo';
+  $block->title = "User Info";
+
+  if ($account) {
+    $block->content = theme('advprofile_userinfo', $account);
+  } else {
+    $block->content = "User information not available";
+  }
+
+  return $block;
+}
+
+function advanced_profile_title_userinfo($conf, $context) {
+  return t('"@s" user info', array('@s' => $context->identifier));
+}
+
+/**
+ * Return "my dodges" content type.
+ */
+function advanced_profile_mydodges_content_type() {
+  return array(
+    'description' => array(
+      'title' => t('My Dodges'),
+      'icon' => 'icon_user.png',
+      'path' => panels_get_path('content_types/user'),
+      'description' => t('Shows dodges for the profile user'),
+      'required context' => new panels_required_context(t('User'), 'user'),
+      'category' => array(t('User context'), -9),
+    ),
+  );
+}
+
+/**
+ * Output function for the 'my dodges' content type.
+ */
+function advanced_profile_mydodges_content($conf, $panel_args, $context) {
+  $account = isset($context->data) ? drupal_clone($context->data) : NULL;
+  $block->module = 'mydodges';
+  $block->title = "My Dodges";
+
+  if ($account) {
+    $dodges = _dodge_history_of_user(arg(1), 5, TRUE);
+    $output = theme('dodge_block_history_of_user', $dodges, $account);
+
+    global $user;
+    if ($user->uid == $account->uid) {
+      $output .= '<br>' . l('Add dodge', "user/$account->uid/edit/dodge");
+   }
+    $block->content = $output;
+  } else {
+    $block->content = "User's dodges are not available";
+  }
+
+  return $block;
+}
+
+// Load the exported panel pages
+function advanced_profile_default_panel_pages() {
+  include_once drupal_get_path('module', 'advanced_profile') . '/includes/advprofile_panels.inc';
+  return _advanced_profile_default_panel_pages();
+}
+
+// Load the exported mini panels
+function advanced_profile_default_panel_minis() {
+  include_once drupal_get_path('module', 'advanced_profile') . '/includes/advprofile_panels.inc';
+  return _advanced_profile_default_panel_minis();
+}
+
+// Load the exported view panes
+function advanced_profile_default_panel_views() {
+  include_once drupal_get_path('module', 'advanced_profile') . '/includes/advprofile_panels.inc';
+  return _advanced_profile_default_panel_views();
+}
+
+/*** VIEWS *******************************************************************/
+
+/**
+ * Loads the included views
+ */
+function advanced_profile_views_default_views() {
+
+  $views_dir = drupal_get_path('module', 'advanced_profile') . '/includes/';
+  $views = array();
+
+  include_once $views_dir . 'view-buddylist_of_uid.inc';
+  include_once $views_dir . 'view-gallery_user.inc';
+  include_once $views_dir . 'view-user_tracker.inc';
+  include_once $views_dir . 'view-blog_of_uid.inc';
+  include_once $views_dir . 'view-user_list.inc';
+
+  return $views;
+}
+
+/**
+ * Themes the buddylist view so that we get rid of the list markup
+ */
+function phptemplate_views_view_list_buddylist_of_uid($view, $nodes, $type) {
+  $fields = _views_get_fields();
+
+  $taken = array();
+
+  // Set up the fields in nicely named chunks.
+  foreach ($view->field as $id => $field) {
+    $field_name = $field['field'];
+    if (isset($taken[$field_name])) {
+      $field_name = $field['queryname'];
+    }
+    $taken[$field_name] = true;
+    $field_names[$id] = $field_name;
+  }
+
+  // Set up some variables that won't change.
+  $base_vars = array(
+    'view' => $view,
+    'view_type' => $type,
+  );
+
+  foreach ($nodes as $i => $node) {
+    $vars = $base_vars;
+    $vars['node'] = $node;
+    $vars['count'] = $i;
+    $vars['stripe'] = $i % 2 ? 'even' : 'odd';
+    foreach ($view->field as $id => $field) {
+      $name = $field_names[$id];
+      $vars[$name] = views_theme_field('views_handle_field', $field['queryname'], $fields, $field, $node, $view);
+      if (isset($field['label'])) {
+        $vars[$name . '_label'] = $field['label'];
+      }
+    }
+    $items[] = _phptemplate_callback("advanced_profile_view_buddylist_of_uid", $vars);
+  }
+  if ($items) {
+    return implode(" ",$items);
+  }
+}
+

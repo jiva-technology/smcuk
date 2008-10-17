@@ -1,0 +1,10 @@
+; $Id: advanced_forum.info,v 1.8 2008/04/02 19:46:20 michellec Exp $
+name = Advanced Forum
+description = Add extra theming and functionality to core forums.
+dependencies = forum
+
+; Information added by drupal.org packaging script on 2008-05-12
+version = "5.x-1.x-dev"
+project = "advanced_forum"
+datestamp = "1210593646"
+

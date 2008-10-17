@@ -1,0 +1,3 @@
+; $Id: filterbynodetype.info,v 1.1.2.1 2007/06/18 23:06:43 dww Exp $
+name = Filter By Node Type
+description = Restrict what input formats are available by node type

@@ -1,0 +1,4 @@
+name = Talk
+description = Display comments on a seperate talk page
+dependencies = comment
+version = "5.x-1.x-dev"

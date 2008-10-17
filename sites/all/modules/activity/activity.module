@@ -1,0 +1,708 @@
+<?php
+// $Id: activity.module,v 1.1.2.2.2.30 2008/04/29 15:59:29 jaydub Exp $
+
+
+/**
+ * @file
+ * Activity module: Allow users to see their friends' activity on the site.
+ */
+
+define('ACTIVITY_ALL', -1);
+
+/**
+ * Implementation of hook_perm().
+ */
+function activity_perm() {
+  return array('administer activity', 'view own activity', 'view public activity');
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function activity_menu($may_cache) {
+  $items = array();
+  global $user;
+
+  if ($may_cache) {
+    $items[] = array(
+      'path' => 'activity',
+      'title' => t('Activity'),
+      'callback' => 'activity_page',
+      'access' => user_access('view public activity'),
+      'weight' => 1,
+    );
+    $items[] = array(
+      'path' => 'activity/all',
+      'title' => t('All activity'),
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+      'access' => user_access('view public activity'),
+    );
+    $items[] = array(
+      'path' => 'activity/mine',
+      'title' => t('My activity'),
+      'access' => $user->uid,
+      'type' => MENU_LOCAL_TASK,
+      'access' => user_access('view own activity'),
+    );
+    $items[] = array(
+      'path' => 'activity/all/feed',
+      'title' => t('All activity RSS'),
+      'callback' => 'activity_feed',
+      'callback arguments' => array(ACTIVITY_ALL),
+      'type' => MENU_CALLBACK,
+      'access' => user_access('view public activity'),
+    );
+    $items[] = array(
+      'path' => 'activity/all/json',
+      'title' => t('All activity JSON'),
+      'callback' => 'activity_json',
+      'callback arguments' => array(ACTIVITY_ALL, 1),
+      'type' => MENU_CALLBACK,
+      'access' => user_access('view public activity'),
+    );
+    $items[] = array(
+      'path' => 'admin/settings/activity',
+      'title' => t('Activity Settings'),
+      'description' => t('Customize what will display on your users activity page.'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => array('activity_admin_settings'),
+    );
+  }
+  else {
+    if ($user->uid) {
+      $items[] = array(
+        'path' => 'activity/'. $user->uid. '/feed',
+        'title' => t('My activity'),
+        'callback' => 'activity_feed',
+        'callback arguments' => array($user->uid),
+        'type' => MENU_CALLBACK,
+      );
+      $items[] = array(
+        'path' => 'activity/'. $user->uid. '/json',
+        'callback' => 'activity_json',
+        'callback arguments' => array($user->uid, 1),
+        'type' => MENU_CALLBACK,
+      );
+    }
+  }
+  return $items;
+}
+
+/**
+ * Admin section
+ * TODO: 1) the defaults aren't available at activity render time unless this
+ *          this page has been saved. This is potentially confusing since they
+ *          show up in the textfields.
+ */
+function activity_admin_settings() {
+  if ($activity_info = activity_get_info()) {
+
+    $form['general_settings'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('General settings'),
+      '#collapsible' => FALSE,
+    );
+    $form['general_settings']['activity_time_limit'] = array(
+      '#type' => 'select',
+      '#title' => t('Activity time limiter'),
+      '#description' => t("Allows you to set a time limit for recording activity so repeated actions don't flood your activity feed. If the same action is submitted within X seconds of the last activity record of the same type from the same user then the activity is not logged."),
+      '#options' => drupal_map_assoc(array(5, 10, 20, 30, 60, 120, 300, 600, 1800), format_interval),
+      '#default_value' => variable_get('activity_time_limit', 30),
+    );
+
+    foreach ($activity_info as $module => $info) {
+      if (!empty($info)) {
+        $tokens = array();
+        $token_list = array();
+        foreach (token_get_list($module) as $name => $token_array) {
+          $token_list = array_merge($token_list, $token_array);
+        }
+        foreach (token_get_list('activity') as $name => $token_array) {
+          $token_list = array_merge($token_list, $token_array);
+        }
+        ksort($token_list);
+        foreach ($token_list as $token => $desc) {
+          $tokens[] = '['. $token .']: '. $desc;
+        }
+
+        if (count($info['types'])) {
+          $form[$module] = array(
+            '#type' => 'fieldset',
+            '#title' => t('Tokens for @name', array('@name' => t($module))),
+            '#collapsible' => true,
+            '#collapsed' => true,
+            '#description' => t('Available tokens') . theme('item_list', $tokens),
+          );
+
+          if ($ops = $info['ops']) {
+            if ($roles = $info['roles']) {
+              foreach ($roles as $role_name => $role) {
+                $form[$module][$role_name] = array(
+                  '#type' => 'fieldset',
+                  '#title' => t('Messages visible to the "%role_name" role.', array('%role_name' => $role['#name'])),
+                  '#collapsible' => true,
+                  '#collapsed' => false,
+                  '#description' => $role['#description'] ? $role['#description'] : '',
+                );
+              }
+
+              if ($types = $info['types']) {
+                foreach ($ops as $op_name => $op) {
+                  foreach ($info['types'] as $type_name => $type) {
+                    foreach ($roles as $role_name => $role) {
+                      $token_field = "{$module}_{$type_name}_{$op_name}_{$role_name}";
+                      $form[$module][$role_name][$token_field] = array(
+                        '#type' => 'textfield',
+                        '#title' => $type. ': '. $op,
+                        '#default_value' => variable_get($token_field, $role['#default'] ? $role['#default'] : ''),
+                      );
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    drupal_set_message('You must save this form in order for your tokens to work.');
+    return system_settings_form($form);
+  }
+  else {
+    drupal_set_message(t('No supported modules enabled. Check the !activity_section for supported modules.', array('!activity_section' => l(t('Activity section'), 'admin/build/modules'))));
+  }
+}
+
+/**
+ * API function
+ *
+ * @return an array of module names and metadata from those modules that
+ *  implement hook_activity_info.
+ */
+function activity_get_info() {
+  foreach (module_implements('activity_info') as $module) {
+    $info[$module] = module_invoke($module, 'activity_info');
+  }
+  return $info;
+}
+
+/**
+ * API function
+ * Insert an activity record. This gets called by modules wishing to record
+ * their activities.
+ * @param $module The name of the module that is doing the recording, eg. 'node'
+ * @param $type Module's can track more than one type of activity. For example,
+ *   the nodeactivity module tracks activities for each content type separately.
+ *   $type should be an identifier for the calling module to use.
+ */
+function activity_insert($module, $type, $operation, $data, $target_users_roles) {
+  // check time limit, ignore activity if within the limit
+  $result = db_query("SELECT COUNT(*) FROM {activity} WHERE module = '%s' AND type = '%s' AND operation = '%s' AND data = '%s' AND created >= %d", $module, $type, $operation, serialize($data), (time() - variable_get('activity_time_limit', 30)));
+  
+  if (db_fetch_object($result)->count != 0) {
+    return FALSE;
+  }
+  
+  $aid = db_next_id('activity');
+  db_query("INSERT INTO {activity} (aid, module, type,  operation,   created, data)
+                            VALUES (%d,  '%s',   '%s',  '%s',        %d,      '%s')",
+                                   $aid, $module, $type, $operation, time(),  serialize($data));
+  foreach ($target_users_roles as $uid => $role) {
+    db_query("INSERT INTO {activity_targets} (aid, target_uid, target_role) VALUES (%d, %d, '%s')", $aid, $uid, $role);
+  }
+
+  $activity = array(
+    'module' => $module,
+    'type' => $type,
+    'operation' => $operation,
+    'data' => $data,
+    'target_user_roles' => $target_users_roles,
+    'aid' => $aid
+  );
+
+  // Invoke activityapi
+  activity_invoke_activityapi($activity, 'insert');
+
+  return $aid;
+}
+
+/**
+ * The API supports:
+ * @param $uids
+ *   - a single uid
+ *   - an array of uids
+ *   - can include the special uid ACTIVITY_ALL
+ * @param $filters
+ *   - an array where keys are one of module, type, operation, target_role
+ *   - values are arrays of possible values for the keys. The key of the 
+ *     array of possible values can be 'include' or 'exclude' to indicate
+ *     if the filter is positive or negative
+ *     For example:
+ *     array('target_role' => array('include' => 'Author'), 'operation' => array('include' => 'delete'))
+ *     this would find activity where the author had deleted something.
+ *     Example 2:
+ *     array('target_role' => array('include' => array('Requester', 'Requestee')))
+ *     This shows that the values can be arrays as well.
+ *     Example 3:
+ *     array('module' => array('include' => array('nodeactivity', 'commentactivity')), 'operation' => array('exclude' => array('delete', 'unpublish')))
+ * @param $limit
+ *   The number of results desired
+ * @param $tablesort_headers
+ *   An array that determines the sorting of the result set.
+ *
+ */
+function activity_get_activity($uids = ACTIVITY_ALL, $filters = NULL, $limit = NULL, $tablesort_headers = NULL) {
+
+  $wheres = array();
+
+  // Build the WHERE clause for user id.
+  if (!is_array($uids)) {
+    $wheres[] = "activity_targets.target_uid = %d";
+    $params[] = $uids;
+  }
+  else {
+    foreach ($uids as $uid) {
+      $nums[] = "%d";
+      $params[] = $uid;
+    }
+    $wheres[] = 'activity_targets.target_uid IN ('. implode(',', $nums). ')';
+  }
+
+  // Build sql limiting query to on filtered fields
+  if (!empty($filters) && is_array($filters)) {
+    foreach ($filters as $column => $filter) {
+      // Of the possible columns, role is in the at table and all others in the
+      // a table. Prefix the column name with the appropriate table.
+      if ($column == 'target_role') {
+        $column = 'activity_targets.target_role';
+      }
+      else {
+        $column = "activity.{$column}";
+      }
+
+      // attempt to rewrite old filters to the new format
+      if (!is_array($filter) || (!array_key_exists('include', $filter) && !array_key_exists('exclude', $filter))) {
+        $filter = array('include' => $filter);
+      }
+
+      foreach ($filter as $criteria => $values) {
+        if (is_array($values)) {
+          foreach ($values as $value) {
+            $strings[] = "'%s'";
+            $params[] = $value;
+          }
+          $wheres[] = $column . ($criteria == 'exclude' ? ' NOT IN ' : ' IN ') .'('. implode(',', $strings). ')';
+        }
+        else {
+          $wheres[] = $column . ($criteria == 'exclude' ? ' != ' : ' = ') ."'%s'";
+          // $values is a string with the single value.
+          $params[] = $values;
+        }
+      }
+    }
+  }
+  if (count($wheres) > 0) {
+    $where = implode(' AND ', $wheres);
+    $where = "WHERE $where";
+  }
+
+  // We always include tablesort_sql in the query so that this API is friendly
+  // to sortable tables. If no headers were passed in, use the default headers.
+  if (empty($tablesort_headers)) {
+    $tablesort_headers = activity_get_tablesort_headers();
+    $tablesort_headers['activity.created']['sort'] = 'desc';
+  }
+
+  // Build the sql and do the query. Wrapping it in db_rewrite_sql allows other
+  // modules to impose access restrictions on activity listings.
+  $sql = "SELECT activity.*, activity_targets.target_uid, activity_targets.target_role
+    FROM {activity_targets} activity_targets INNER JOIN {activity} activity ON activity.aid = activity_targets.aid
+    $where ";
+  $tablesort_sql = tablesort_sql($tablesort_headers);
+
+  $sql = db_rewrite_sql("$sql $tablesort_sql", 'activity_targets', 'aid', array('uids' => $uids));
+
+  if (is_numeric($limit)) {
+    $result = pager_query($sql, $limit, 0, NULL, $params);
+  }
+  else {
+    $result = db_query($sql, $params);
+  }
+  $activity = array();
+  while ($row = db_fetch_array($result)) {
+    $row['data'] = unserialize($row['data']);
+    $row['data']['created'] = $row['created'];
+    $row['data']['activity_id'] = $row['aid'];
+    $row['data']['module'] = $row['module'];
+    $row['data']['type'] = $row['type'];
+    $row['data']['operation'] = ($row['data']['operation'] ? $row['data']['operation'] : $row['operation']);
+
+
+    // Invoke activityapi
+    activity_invoke_activityapi($row, 'load');
+
+    $activity[] = $row;
+  }
+
+  return $activity;
+}
+
+/**
+ * Invoke a hook_activityapi() operation in all modules.
+ *
+ * @param &$activity
+ *   An activity array.
+ * @param $op
+ *   A string containing the name of the nodeapi operation.
+ *    'insert' is called when a new activity is created
+ *    'load' is called when an activity is loaded
+ *    'render' is called before token replacement begins
+ * @return
+ *   The returned value of the invoked hooks.
+ */
+function activity_invoke_activityapi(&$activity, $op) {
+  $return = array();
+  foreach (module_implements('activityapi') as $name) {
+    $function = $name .'_activityapi';
+    $result = $function($activity, $op);
+    if (isset($result) && is_array($result)) {
+      $return = array_merge($return, $result);
+    }
+    else if (isset($result)) {
+      $return[] = $result;
+    }
+  }
+  return $return;
+}
+
+
+function activity_get_tablesort_headers() {
+  return array(
+      'activity_targets.aid' => array('field' => 'activity_targets.aid', 'data' => t('Id')),
+      'activity.module' => array('field' => 'activity.module', 'data' => t('Module')),
+      'activity.type' => array('field' => 'activity.type', 'data' => t('Type')),
+      'activity.operation' => array('field' => 'activity.operation', 'data' => t('Operation')),
+      'activity.created' => array('field' => 'activity.created', 'data' => t('Created')),
+    );
+}
+
+
+/**
+ * create a block for display
+ * @param op
+ * @param delta
+ * @returns block HTML
+ *
+ * TODO: Add "more activity" link to blocks which goes to activity table page.
+ */
+function activity_block($op = 'list', $delta = 0) {
+  global $user, $form_values;
+  if ($op == 'list') {
+    $block['my']['info'] = t("Activity: Mine: show the current user's activity.");
+    $block['all']['info'] = t("Activity: All: show all recent activity");
+    return $block;
+  }
+  elseif ($op == 'configure') {
+    $form['items'] = array(
+      '#type' => 'select',
+      '#title' => t('Number of items'),
+      '#default_value' => variable_get('activity_block_'. $delta, 5),
+      '#options' =>drupal_map_assoc(range(1, 50)),
+    );
+    return $form;
+  }
+  elseif ($op == 'save') {
+    variable_set('activity_block_'. $delta, $form_values['items']);
+  }
+  elseif ($op == 'view') {
+    switch ($delta) {
+      case 'my':
+        if (user_access('view own activity')) {
+          // Grab the number of requested activities plus one. We use this one
+          // to determine whether or not to show the "more" link and only display
+          // the correct number of items.
+          $activity = activity_get_activity($user->uid, NULL, variable_get('activity_block_'. $delta, 5) + 1);
+          if ($count = count($activity)) {
+            if ($count > variable_get('activity_block_'. $delta, 5)) {
+              $more_link = theme('activity_more_link', 'activity/mine');
+              array_pop($activity);
+            }
+            $activites = array();
+            foreach ($activity as $item) {
+              $activities[] = theme('activity', activity_token_replace($item), $item);
+            }
+            return array(
+              'subject' => t('My activity'),
+              'content' => theme('activity_block', $activities, $more_link)
+            );
+          }
+        }
+        break;
+
+      case 'all':
+        if (user_access('view public activity')) {
+          $activity =  activity_get_activity(ACTIVITY_ALL, NULL, variable_get('activity_block_'. $delta, 5) + 1);
+          if ($count = count($activity)) {
+            if ($count > variable_get('activity_block_'. $delta, 5)) {
+              $more_link = theme('activity_more_link', 'activity');
+              array_pop($activity);
+            }
+            $activites = array();
+            foreach ($activity as $item) {
+              $activities[] = theme('activity', activity_token_replace($item), $item);
+            }
+            return array(
+              'subject' => t('Recent activity'),
+              'content' => theme('activity_block', $activities, $more_link)
+            );
+          }
+        }
+        break;
+    }
+  }
+}
+
+function activity_page($page = 'all') {
+  global $user;
+  if ($page == 'mine') {
+    $activities = activity_get_activity($user->uid, NULL, 20);
+    $table = activity_table($activities);
+    $feed_url =  url('activity/'. $user->uid. '/feed');
+    drupal_add_feed($feed_url);
+    $feed = theme('feed_icon', $feed_url);
+    return theme('activity_page', $activities, $table);
+  }
+  else if ($page == 'all') {
+    $activities = activity_get_activity(ACTIVITY_ALL, NULL, 20);
+    $table = activity_table($activities);
+    $feed_url =  url('activity/all/feed');
+    drupal_add_feed($feed_url);
+    $feed = theme('feed_icon', $feed_url);
+    return theme('activity_page', $activities, $table);
+  }
+}
+
+/**
+ * Menu callback to display the records in a page
+ */
+function activity_table($activities) {
+  $display_headers = array(
+    'created' => array('field' => 'created', 'data' => t('Date')),
+    //t('Visible to'),
+    t('Message'),
+  );
+  $rows = array();
+  foreach ($activities as $activity) {
+    if ($activity['target_uid'] == ACTIVITY_ALL) {
+      $visible_to = t('Everyone');
+    }
+    else if ($activity['target_uid'] == $user->uid) {
+      $visible_to = t('You');
+    }
+    else {
+      // TODO: if this column gets reinstated load the user information differently
+      $visible_to = theme('username', user_load(array('uid' => $activity['target_uid'])));
+    }
+    if ($activity_message = activity_token_replace($activity)) {
+      $rows[] = array(
+        format_date($activity['created'], 'small'),
+        //$visible_to,
+        theme('activity', $activity_message, $activity),
+      );
+    }
+  }
+  $output = theme('table', $display_headers, $rows);
+  $output .= theme('pager');
+  return $output;
+}
+
+/**
+ * menu callback to return a feed of a signed in user's activity page
+ */
+function activity_feed($arg) {
+  global $locale;
+  if ($arg == ACTIVITY_ALL) {
+    $activities = activity_get_activity(ACTIVITY_ALL, NULL, 20);
+    $url =  url('activity/all', NULL, NULL, TRUE);
+    $feed_title = t('All activity');
+  }
+  else if (is_numeric($arg)) {
+    $user = db_fetch_object(db_query('SELECT uid, name FROM {users} WHERE uid = %d', $arg));
+    if ($user) {
+      $activities = activity_get_activity($arg, NULL, 20);
+      $url =  url('activity/'. $user->uid, NULL, NULL, TRUE);
+      $feed_title = t('Activity for @username', array('@username' => $user->name));
+    }
+  }
+
+  if (count($activities) > 0) {
+    foreach ($activities as $activity) {
+      $function = $activity['module']. '_format_rss_item';
+      if (function_exists($function)) {
+        // each module gets a chance to build its own feed item.
+        // They should use the $activity to prepare variables and
+        // call format_rss_item($title, $link, $item_text, $extra);
+        $items .= $function($activity);
+      }
+      else {
+        $message = activity_token_replace($activity);
+        $items .= format_rss_item(strip_tags($message), url('activity/'. $user->uid, NULL, NULL, TRUE), format_date($activity['created']). '<p>'. $message. '</p>');
+      }
+    }
+  }
+  $channel = array(
+    'version'     => '2.0',
+    'title'       => variable_get('site_name', 'Drupal') .' - '. $feed_title,
+    'link'        => $url,
+    'description' => variable_get('site_mission', ''),
+    'language'    => $locale,
+  );
+
+  // TODO: Figure out what the right namespace should be.
+  $namespaces = array('xmlns:dc="http://purl.org/dc/elements/1.1/"');
+  $output = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n";
+  $output .= "<rss version=\"". $channel["version"] ."\" xml:base=\"". $url ."\" ". implode(' ', $namespaces) .">\n";
+  $output .= format_rss_channel($channel['title'], $channel['link'], $channel['description'], $items, $channel['language']);
+  $output .= "</rss>\n";
+
+  drupal_set_header('Content-Type: application/rss+xml; charset=utf-8');
+  print $output;
+}
+
+/**
+ * output our activity as json
+ * $arg[0] = ACTIVITY_ALL or $uid
+ * $arg[1] = number of activities to retreive
+ */
+function activity_json($arg) {
+  global $locale;
+  $args = func_get_args();
+  if ($args[0] == ACTIVITY_ALL) {
+    // get the latest activity posted
+    $activities = activity_get_activity(ACTIVITY_ALL, NULL, $args[1]);
+    $url =  url('activity/all', NULL, NULL, TRUE);
+    $feed_title = t('All activity');
+  }
+  else if (is_numeric($args[0])) {
+    $user = db_fetch_object(db_query('SELECT uid, name FROM {users} WHERE uid = %d', $args[0]));
+    if ($user) {
+      // get the latest activity posted pertaining to this user
+      $activities = activity_get_activity($arg[0], NULL, $args[1]);
+      $url =  url('activity/'. $user->uid, NULL, NULL, TRUE);
+      $feed_title = t('Activity for @username', array('@username' => theme('username', $user)));
+    }
+  }
+  if (count($activities) > 0) {
+    foreach ($activities as $activity) {
+      $message = activity_token_replace($activity);
+      $items .= '<item><date>'. format_date($activity['created'], 'small') .'</date>';
+      $items .= '<url>'. url('activity/'. $user->uid, NULL, NULL, TRUE) .'</url>';
+      $items .= '<message>'. $message .'</message></item>';
+    }
+  }
+  drupal_set_header('Content-Type: application/x-javascript');
+  print drupal_to_js($items);
+  die();
+}
+
+/**
+ * Token module integration.
+ */
+function activity_token_list($type = 'all') {
+  if ($type == 'activity') {
+    $tokens = array('activity' => array());
+    $tokens['activity'] = array(
+      'time-small' => t('Date and time in small format: @example', array('@example' => format_date(time(), 'small'))),
+      'time-medium' => t('Date and time in medium format: @example', array('@example' => format_date(time(), 'medium'))),
+      'time-large' => t('Date and time in large format: @example', array('@example' => format_date(time(), 'large'))),
+      'time-ago' => t('How long ago did this happen? Example: %time-ago', array('%time-ago' => format_interval(time() - 60*60*36))),
+    );
+    return $tokens;
+  }
+}
+
+function activity_token_values($type, $data = NULL, $options = array()) {
+  if ($type == 'activity' && !empty($data)) {
+    $tokens = array(
+      'time-small' => format_date($data['created'], 'small'),
+      'time-medium' => format_date($data['created'], 'medium'),
+      'time-large' => format_date($data['created'], 'large'),
+      'time-ago' => format_interval(time() - $data['created']),
+    );
+    return $tokens;
+  }
+}
+
+/**
+ * determine what the message should say
+ */
+function activity_token_replace($activity) {
+  extract($activity);
+
+  $var = "{$module}_{$type}_{$operation}_{$target_role}";
+  if ($pattern = variable_get($var, FALSE)) {
+    // Invoke activityapi
+    activity_invoke_activityapi($activity, 'render');
+    $message = token_replace($pattern, $module, $data);
+    $message = token_replace($message, 'activity', $data);
+    return $message;
+  }
+}
+
+/**
+ * date formatter
+ * $timestamp is the unix timestamp() of when an activity occurred.
+ * $end is the human language formatted string expressing how long ago this was.
+ */
+function activity_format_offset($timestamp) {
+  $offset = (strftime("%j") + strftime("%Y") * 365) - (strftime("%j", $timestamp) + strftime("%Y", $timestamp) * 365);
+  if ($offset >= 7) {
+    $offset = (strftime("%V") + strftime("%Y") * 52) - (strftime("%V", $timestamp) + strftime("%Y", $timestamp) * 52);
+    $end = $offset != 0 ? format_plural($offset, t("a week ago"), t("@count weeks ago", array("@count" => $offset))) : t("Today");
+  }
+  else if ($offset > 0) {
+    $end = format_plural($offset, t('Yesterday'), t('@count days ago', array('@count' => $offset)));
+  }
+  else {
+    $end = t('Today');
+  }
+  return $end;
+}
+
+/**
+* Implementation of hook_simpletest().
+*/
+function activity_simpletest() {
+  $module_name = 'activity';
+  $dir = drupal_get_path('module', $module_name). '/tests';
+  $tests = file_scan_directory($dir, '\.test$');
+  return array_keys($tests);
+}
+
+
+/**
+ * theme function for displaying the users activity page
+ */
+function theme_activity_page($activities, $table) {
+  return $table;
+  //return theme('item_list', $items, NULL, 'ul', array('class' => 'activity-list'));
+}
+
+/**
+ * theme function for displaying the users activity page
+ */
+function theme_activity_block($activities, $more_link = '') {
+  if ($content = theme('item_list', $activities, NULL, 'ul', array('class' => 'activity-list'))) {
+    $content .= $more_link;
+    return $content;
+  }
+}
+
+function theme_activity_more_link($path) {
+  return '<div class="more-link">'. l(t('more'), $path, array('title' => t('See all of your activity.'))) .'</div>';
+}
+
+function theme_activity($message, $item) {
+  // $item is the unprocessed activity item so that themers can do more with it.
+  return '<span class="activity">'. $message. '</span>';
+}

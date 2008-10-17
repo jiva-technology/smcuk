@@ -1,0 +1,4 @@
+; $Id: category.info,v 1.1 2007/01/05 15:31:15 jaza Exp $
+name = Category
+description = Allows you to structure your site and categorize content.
+package = Category

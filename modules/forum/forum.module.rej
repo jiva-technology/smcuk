@@ -1,0 +1,89 @@
+***************
+*** 55,61 ****
+      ),
+      'forum_submitted' => array(
+        'file' => 'forum-submitted',
+-       'arguments' => array('topic' => NULL),
+      ),
+    );
+  }
+--- 55,61 ----
+      ),
+      'forum_submitted' => array(
+        'file' => 'forum-submitted',
++       'arguments' => array('topic' => NULL, 'page' => FALSE),
+      ),
+    );
+  }
+***************
+*** 482,488 ****
+      // This query does not use full ANSI syntax since MySQL 3.x does not support
+      // table1 INNER JOIN table2 INNER JOIN table3 ON table2_criteria ON table3_criteria
+      // used to join node_comment_statistics to users.
+-     $sql = "SELECT ncs.last_comment_timestamp, IF (ncs.last_comment_uid != 0, u2.name, ncs.last_comment_name) AS last_comment_name, ncs.last_comment_uid FROM {node} n INNER JOIN {users} u1 ON n.uid = u1.uid INNER JOIN {term_node} tn ON n.nid = tn.nid INNER JOIN {node_comment_statistics} ncs ON n.nid = ncs.nid INNER JOIN {users} u2 ON ncs.last_comment_uid=u2.uid WHERE n.status = 1 AND tn.tid = %d ORDER BY ncs.last_comment_timestamp DESC";
+      $sql = db_rewrite_sql($sql);
+      $topic = db_fetch_object(db_query_range($sql, $forum->tid, 0, 1));
+  
+--- 482,488 ----
+      // This query does not use full ANSI syntax since MySQL 3.x does not support
+      // table1 INNER JOIN table2 INNER JOIN table3 ON table2_criteria ON table3_criteria
+      // used to join node_comment_statistics to users.
++     $sql = "SELECT ncs.last_comment_timestamp, IF (ncs.last_comment_uid != 0, u2.name, ncs.last_comment_name) AS last_comment_name, ncs.last_comment_uid, n.nid, n.title FROM {node} n INNER JOIN {users} u1 ON n.uid = u1.uid INNER JOIN {term_node} tn ON n.nid = tn.nid INNER JOIN {node_comment_statistics} ncs ON n.nid = ncs.nid INNER JOIN {users} u2 ON ncs.last_comment_uid=u2.uid WHERE n.status = 1 AND tn.tid = %d ORDER BY ncs.last_comment_timestamp DESC";
+      $sql = db_rewrite_sql($sql);
+      $topic = db_fetch_object(db_query_range($sql, $forum->tid, 0, 1));
+  
+***************
+*** 491,496 ****
+        $last_post->timestamp = $topic->last_comment_timestamp;
+        $last_post->name = $topic->last_comment_name;
+        $last_post->uid = $topic->last_comment_uid;
+      }
+      $forum->last_post = $last_post;
+  
+--- 491,498 ----
+        $last_post->timestamp = $topic->last_comment_timestamp;
+        $last_post->name = $topic->last_comment_name;
+        $last_post->uid = $topic->last_comment_uid;
++       $last_post->nid = $topic->nid;
++       $last_post->title = $topic->title;
+      }
+      $forum->last_post = $last_post;
+  
+***************
+*** 762,769 ****
+        $row++;
+  
+        $variables['topics'][$id]->title = l($topic->title, "node/$topic->nid");
+-       $variables['topics'][$id]->created = theme('forum_submitted', $topic);
+-       $variables['topics'][$id]->last_reply = theme('forum_submitted', isset($topic->last_reply) ? $topic->last_reply : NULL);
+  
+        $variables['topics'][$id]->new_text = '';
+        $variables['topics'][$id]->new_url = '';
+--- 764,771 ----
+        $row++;
+  
+        $variables['topics'][$id]->title = l($topic->title, "node/$topic->nid");
++       $variables['topics'][$id]->created = theme('forum_submitted', $topic, TRUE);
++       $variables['topics'][$id]->last_reply = theme('forum_submitted', isset($topic->last_reply) ? $topic->last_reply : NULL, TRUE);
+  
+        $variables['topics'][$id]->new_text = '';
+        $variables['topics'][$id]->new_url = '';
+***************
+*** 865,870 ****
+  function template_preprocess_forum_submitted(&$variables) {
+    $variables['author'] = isset($variables['topic']->uid) ? theme('username', $variables['topic']) : '';
+    $variables['time'] = isset($variables['topic']->timestamp) ? format_interval(time() - $variables['topic']->timestamp) : '';
+  }
+  
+  function _forum_user_last_visit($nid) {
+--- 867,876 ----
+  function template_preprocess_forum_submitted(&$variables) {
+    $variables['author'] = isset($variables['topic']->uid) ? theme('username', $variables['topic']) : '';
+    $variables['time'] = isset($variables['topic']->timestamp) ? format_interval(time() - $variables['topic']->timestamp) : '';
++   if ($variables['page'] === NULL) {
++     $variables['nid'] = $variables['topic']->nid;
++     $variables['title'] = $variables['topic']->title;
++   }
+  }
+  
+  function _forum_user_last_visit($nid) {

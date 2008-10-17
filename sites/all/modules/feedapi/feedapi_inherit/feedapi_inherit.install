@@ -1,0 +1,10 @@
+<?php
+// $Id: feedapi_inherit.install,v 1.1.2.3 2007/12/18 18:59:54 alexb Exp $
+
+function feedapi_inherit_install() {
+  
+}
+
+function feedapi_inherit_uninstall() {
+  
+}

@@ -1,0 +1,96 @@
+***************
+*** 863,879 ****
+      }
+    }
+  
+-   // Link to the next new comment.
+-   if (isset($comment->next) && isset($comment->next_page_number)) {
+-     $page = $comment->next_page_number >= 1 ? "page=". $comment->next_page_number : NULL;
+-     $links['comment_next'] = array(
+-       'title' => t('jump to next new comment'),
+-       'href' => 'node/'. $comment->nid,
+-       'query' => $page,
+-       'fragment' => 'comment-'. $comment->next,
+-     );
+-   }
+- 
+    return $links;
+  }
+  
+--- 863,868 ----
+      }
+    }
+  
+    return $links;
+  }
+  
+***************
+*** 1012,1044 ****
+        // Start a form, for use with comment control.
+        $result = pager_query($query, $comments_per_page, 0, $query_count, $query_args);
+  
+-       // Get the current page number, set in the above pager_query() call.
+-       // This is used below when marking next new comments.
+-       global $pager_page_array;
+-       $pagenum = $pager_page_array[0];
+- 
+        $divs = 0;
+        $num_rows = FALSE;
+        $comments = '';
+-       $comments_array = array();
+        drupal_add_css(drupal_get_path('module', 'comment') .'/comment.css');
+        while ($comment = db_fetch_object($result)) {
+          $comment = drupal_unpack($comment);
+          $comment->name = $comment->uid ? $comment->registered_name : $comment->name;
+          $comment->depth = count(explode('.', $comment->thread)) - 1;
+-         // If this is a new comment, go back and edit the last new comment
+-         // before this one, to indicate the cid and page number to link to.
+-         $comment->new = node_mark($comment->nid, $comment->timestamp);
+-         if ($comment->new != MARK_READ) {
+-           if (isset($last_new_comment)) {
+-             $comments_array[$last_new_comment]->next = $comment->cid;
+-             $comments_array[$last_new_comment]->next_page_number = $pagenum;
+-           }
+-           $last_new_comment = $comment->cid;
+-         }
+-         $comments_array[$comment->cid] = $comment;
+-       }
+-       foreach ($comments_array as $comment) {
+          if ($mode == COMMENT_MODE_THREADED_COLLAPSED || $mode == COMMENT_MODE_THREADED_EXPANDED) {
+            if ($comment->depth > $divs) {
+              $divs++;
+--- 1001,1015 ----
+        // Start a form, for use with comment control.
+        $result = pager_query($query, $comments_per_page, 0, $query_count, $query_args);
+  
+        $divs = 0;
+        $num_rows = FALSE;
+        $comments = '';
+        drupal_add_css(drupal_get_path('module', 'comment') .'/comment.css');
+        while ($comment = db_fetch_object($result)) {
+          $comment = drupal_unpack($comment);
+          $comment->name = $comment->uid ? $comment->registered_name : $comment->name;
+          $comment->depth = count(explode('.', $comment->thread)) - 1;
++ 
+          if ($mode == COMMENT_MODE_THREADED_COLLAPSED || $mode == COMMENT_MODE_THREADED_EXPANDED) {
+            if ($comment->depth > $divs) {
+              $divs++;
+***************
+*** 1601,1609 ****
+    static $first_new = TRUE;
+  
+    $output = '';
+-   if (!isset($comment->new)) {
+-     $comment->new = node_mark($comment->nid, $comment->timestamp);
+-   }
+    if ($first_new && $comment->new != MARK_READ) {
+      // Assign the anchor only for the first new comment. This avoids duplicate
+      // id attributes on a page.
+--- 1572,1578 ----
+    static $first_new = TRUE;
+  
+    $output = '';
++   $comment->new = node_mark($comment->nid, $comment->timestamp);
+    if ($first_new && $comment->new != MARK_READ) {
+      // Assign the anchor only for the first new comment. This avoids duplicate
+      // id attributes on a page.

@@ -1,0 +1,257 @@
+<?php
+// $Id: book.module.copyme,v 1.6 2007/01/05 15:31:16 jaza Exp $
+
+/**
+ * @file
+ * Wrapper module to provide a compatibility layer between the book
+ * module and the category module.
+ */
+
+/**
+ * Implementation of hook_menu().
+ */
+function book_menu($may_cache) {
+  $items = array();
+
+  if ($may_cache) {
+    $items[] = array(
+      'path' => 'book/export',
+      'callback' => 'book_export',
+      'access' => user_access('access content'),
+      'type' => MENU_CALLBACK);
+  }
+
+  return $items;
+}
+
+/**
+ * Implementation of hook_insert().
+ */
+function book_insert($node) {
+  // BEGIN legacy book code that keeps the old DB table up-to-date
+  if (variable_get('book_maintain_db', 1)) {
+    db_query("INSERT INTO {book} (nid, vid, parent, weight) VALUES (%d, %d, %d, %d)", $node->nid, $node->vid, $node->parent, $node->weight);
+  }
+  // END legacy book code
+}
+
+/**
+ * Implementation of hook_update().
+ */
+function book_update($node) {
+  // BEGIN legacy book code that keeps the old DB table up-to-date
+  if (variable_get('book_maintain_db', 1)) {
+    if ($node->revision) {
+      db_query("INSERT INTO {book} (nid, vid, parent, weight) VALUES (%d, %d, %d, %d)", $node->nid, $node->vid, $node->parent, $node->weight);
+    }
+    else {
+      db_query("UPDATE {book} SET parent = %d, weight = %d WHERE vid = %d", $node->parent, $node->weight, $node->vid);
+    }
+  }
+  // END legacy book code
+}
+
+/**
+ * Implementation of hook_delete().
+ */
+function book_delete(&$node) {
+  // BEGIN legacy book code that keeps the old DB table up-to-date
+  if (variable_get('book_maintain_db', 1)) {
+    db_query('DELETE FROM {book} WHERE nid = %d', $node->nid);
+  }
+  // END legacy book code
+}
+
+/**
+ * Implementation of hook_submit().
+ */
+function book_submit(&$node) {
+  _book_book_into_category($node);
+}
+
+/**
+ * Given a node, this function returns an array of 'book node' objects
+ * representing the path in the book tree from the root to the
+ * parent of the given node.
+ *
+ * @param node - a book node object for which to compute the path
+ *
+ * @return - an array of book node objects representing the path of
+ * nodes root to parent of the given node. Returns an empty array if
+ * the node does not exist or is not part of a book hierarchy.
+ *
+ */
+function book_location($node, $nodes = array()) {
+  return category_location($node, FALSE, $nodes);
+}
+
+/**
+ * Accumulates the nodes up to the root of the book from the given node in the $nodes array.
+ */
+function book_location_down($node, $nodes = array()) {
+  return category_location_down($node, FALSE, $nodes);
+}
+
+/**
+ * Fetches the node object of the previous page of the book.
+ */
+function book_prev($node) {
+  $obj = category_prev($node->nid);
+  $obj->nid = $obj->cid;
+  unset($obj->cid);
+  return $obj;
+}
+
+/**
+ * Fetches the node object of the next page of the book.
+ */
+function book_next($node) {
+  $obj = category_next($node->nid);
+  $obj->nid = $obj->cid;
+  unset($obj->cid);
+  return $obj;
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ *
+ * Appends book navigation to all nodes in the book.
+ */
+function book_nodeapi(&$node, $op, $teaser, $page) {
+  switch ($op) {
+    case 'insert':
+      if (category_is_cat_or_cont($node->nid)) {
+        book_insert($node);
+      }
+      break;
+    case 'update':
+      if (category_is_cat_or_cont($node->nid)) {
+        book_update($node);
+      }
+      break;
+    case 'delete':
+      if (category_is_cat_or_cont($node->nid)) {
+        book_delete($node);
+      }
+      break;
+    case 'delete revision':
+      // BEGIN legacy book code that keeps the old DB table up-to-date
+      if (variable_get('book_maintain_db', 1)) {
+        db_query('DELETE FROM {book} WHERE nid = %d', $node->nid);
+      }
+      // END legacy book code
+      break;
+  }
+}
+
+/**
+ * Menu callback; Generates various representation of a book page with
+ * all descendants and prints the requested representation to output.
+ *
+ * The function delegates the generation of output to helper functions.
+ * The function name is derived by prepending 'book_export_' to the
+ * given output type.  So, e.g., a type of 'html' results in a call to
+ * the function book_export_html().
+ *
+ * @param type
+ *   - a string encoding the type of output requested.
+ *       The following types are currently supported in book module
+ *          html: HTML (printer friendly output)
+ *       Other types are supported in contributed modules.
+ * @param nid
+ *   - an integer representing the node id (nid) of the node to export
+ *
+ */
+function book_export($type = 'html', $nid = 0) {
+  category_export($type, $nid, 'book_export_');
+}
+
+/**
+ * Given a node, this function returns the depth of the node in its hierarchy.
+ * A root node has depth 1, and children of a node of depth n have depth (n+1).
+ *
+ * @param nid
+ *   - the nid of the node whose depth to compute.
+ * @return
+ *   - the depth of the given node in its hierarchy.  Returns 0 if the node
+ *  does not exist or is not part of a book hierarchy.
+ */
+function _book_get_depth($nid) {
+  return _category_get_depth($nid);
+}
+
+/**
+ * Traverses the book tree.  Applies the $visit_pre() callback to each
+ * node, is called recursively for each child of the node (in weight,
+ * title order).  Finally appends the output of the $visit_post()
+ * callback to the output before returning the generated output.
+ *
+ * @param nid
+ *  - the node id (nid) of the root node of the book hierarchy.
+ * @param depth
+ *  - the depth of the given node in the book hierarchy.
+ * @param visit_pre
+ *  - a function callback to be called upon visiting a node in the tree
+ * @param visit_post
+ *  - a function callback to be called after visiting a node in the tree,
+ *    but before recursively visiting children.
+ * @return
+ *  - the output generated in visiting each node
+ */
+function book_recurse($nid = 0, $depth = 1, $visit_pre, $visit_post) {
+  return category_recurse($nid, $depth, $visit_pre, $visit_post);
+}
+
+/**
+ * Implementation of hook_category().
+ */
+function book_category($op, $node = NULL) {
+  switch ($op) {
+    case 'settings':
+      // Menu item settings
+      $form['book'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Book wrapper settings'),
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+        '#weight' => 8,
+      );
+      $form['book']['book_maintain_db'] = array(
+        '#type' => 'radios',
+        '#title' => t('Maintain book structure in book table'),
+        '#default_value' =>  variable_get('book_maintain_db', '1'),
+        '#options' => array('1' => t('Enabled'), '0' => t('Disabled')),
+        '#description' => t('Maintains a mirror copy of the structure information for your categories and containers in the book module\'s database table, as a series of parent-child relationships. It is recommended that you enable this setting, as many book-dependent modules directly access the book database table, instead of using the book function interface.')
+      );
+
+      return $form;
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_help().
+ */
+function book_help($section) {
+  switch ($section) {
+    case 'admin/help#book':
+      return t('<p>This is a wrapper module to provide a compatibility layer between the book module and the category module. Modules that depend on the book module should function correctly with this wrapper module enabled, as it routes all book requests to the category API, and converts category data types into book data types. The book module user interface is not available with this wrapper module: you should use the category module user interface instead. For further assistance, see the <a href="!category">category module help page</a>.</p>', array('!category' => url('admin/help', NULL, 'category')));
+  }
+}
+
+function _book_book_into_category(&$node) {
+  $cnid = 0;
+  $parent = $node->parent;
+  while (!$cnid && ($parent_node = node_load($parent))) {
+    if (category_is_cat_or_cont($parent_node->nid)) {
+      $type = category_node_get_type($parent_node);
+      if ($type == 'category_cont') {
+        $cnid = $parent_node->nid;
+      }
+    }
+  }
+  $node->cnid = $cnid;
+
+  $node->type = $cnid ? 'category-cat' : 'category_cont';
+  $node->parents = $node->parent ? array($node->parent) : array();
+}

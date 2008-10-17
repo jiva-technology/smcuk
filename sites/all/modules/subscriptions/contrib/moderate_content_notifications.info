@@ -1,0 +1,5 @@
+; $Id: moderate_content_notifications.info,v 1.1.2.1 2008/04/14 22:27:12 chx Exp $
+name = Moderate Content Notifications
+description = Spam deterrent: make sure no spam is sent from our web site.
+package = "Subscriptions"
+dependencies = subscriptions_content

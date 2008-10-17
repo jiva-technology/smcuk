@@ -1,0 +1,27 @@
+Index: clickpath.module
+===================================================================
+RCS file: /cvs/drupal-contrib/contributions/modules/clickpath/Attic/clickpath.module,v
+retrieving revision 1.1.2.1.2.2
+diff -u -p -r1.1.2.1.2.2 clickpath.module
+--- clickpath.module	12 Dec 2007 04:44:39 -0000	1.1.2.1.2.2
++++ clickpath.module	17 Jun 2008 22:10:48 -0000
+@@ -2,6 +2,12 @@
+ // $Id: clickpath.module,v 1.1.2.1.2.2 2007/12/12 04:44:39 eaton Exp $
+ 
+ /**
++*experimental add back port of D6 functionality
++**/
++
++include_once ("clickpath.inc");
++
++/**
+  * @file
+  * Saves and displays the user's most recently visited links in the site.
+  *
+@@ -178,4 +184,4 @@ function clickpath_save_path($path) {
+     }
+     $_SESSION['clickpath'] = $clickpath;
+   }
+-}
+\ No newline at end of file
++}

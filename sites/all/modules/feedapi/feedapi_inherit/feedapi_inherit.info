@@ -1,0 +1,5 @@
+; $Id: feedapi_inherit.info,v 1.1.2.8 2008/04/11 19:46:33 aronnovak Exp $
+name = FeedAPI Inherit
+description = "Passes on group and taxonomy information from feed to feed items. Requires FeedAPI Node processor."
+dependencies = feedapi feedapi_node
+package = "FeedAPI Add On"

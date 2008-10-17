@@ -1,0 +1,5 @@
+; $Id: tabs.info,v 1.1.2.3 2007/08/08 21:26:10 nedjo Exp $
+name = Tabs
+description = A helper module for creating tabbed pages.
+package = Javascript tools
+dependencies = jstools

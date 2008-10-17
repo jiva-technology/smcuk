@@ -1,0 +1,282 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: FCKEditor\n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: 2007-09-17 17:50+0100\n"
+"Last-Translator: Michele Cillo <m.cillo@itsspring.com>\n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+"X-Poedit-Language: Italian\n"
+"X-Poedit-Country: ITALY\n"
+
+#: fckeditor.module:21
+#: ;122
+msgid "Enables the usage of FCKeditor (WYSIWYG editor) instead of plain text fields."
+msgstr "Abilita l'utilizzo di FCKeditor (editor WYSIWYG) in luogo dei campi di testo semplice."
+
+#: fckeditor.module:24
+#: ;32
+msgid ""
+"<p>The FCKeditor module allows Drupal to replace textarea fields with a rich text or <acronym title=\"What You See Is What You Get\">WYSIWYG</acronym> editor. This editor brings many of the powerful functionalities of known desktop editors like Word to the web. It's relatively lightweight and doesn't require any kind of installation on the client computer.</p>\n"
+"<p>More information is located at the !fckeditorlink. A small user guide is located at !userguidelink.</p>"
+msgstr ""
+"<p>Il modulo FCKeditor permette a Drupal di sostituire i campi di tipo aree di testo con un editor di testo formattato o editor <acronym title=\"What You See Is What You Get\">WYSIWYG</acronym>. Questo editor porta molte delle potenti funzionalità degli editor per PC come Word sul web. Esso è relativamente leggero e non richiede alcuna installazione sul computer che lo utilizza.</p>\n"
+"<p>Maggiori informazioni si possono reperire a !fckeditorlink. Una sintetica guida utente può essere reperita a !userguidelink.</p>"
+
+#: fckeditor.module:27
+#: ;35;43;49;137
+msgid "FCKeditor homepage"
+msgstr "Pagina home di FCKeditor"
+
+#: fckeditor.module:28
+#: ;36
+msgid "FCKeditor userguide"
+msgstr "Guida utente di FCKeditor"
+
+#: fckeditor.module:38
+msgid ""
+"<h3>Installation</h3>\n"
+"<p>Go to the !fckeditorlink and download the latest version. Then\n"
+"uncompress the contents of the \"fckeditor\" directory of the download file to\n"
+"%fckeditordir.</p>"
+msgstr ""
+"<h3>Installazione</h3>\n"
+"<p>Vai a !fckeditorlink e scarica l'ultima versione. Poi decomprimi il contenuto della cartella \"fckeditor\" directory del file scaricato in \n"
+"%fckeditordir.</p>"
+
+#: fckeditor.module:46
+msgid ""
+"<h3>Installation troubleshooting</h3>\n"
+"<p>If your FCKeditor does not show you must check if all files are extracted correctly. The directory %fckeditordir should have the following files <code>fckeditor.js, fckconfig.js, fckstyles.xml, fcktemplates.xml</code> and a directory named <code>editor</code>.</p>"
+msgstr ""
+"<h3>Problemi di installazione</h3>\n"
+"<p>Se il tuo FCKeditor non viene visualizzato dovresti controllare se tutti i file sono stati estratti correttamente. La cartella %fckeditordir dovrebbe contenere  i seguenti file <code>fckeditor.js, fckconfig.js, fckstyles.xml, fcktemplates.xml</code> e una cartella chiamata <code>editor</code>.</p>"
+
+#: fckeditor.module:52
+msgid ""
+"<h3>Configuration</h3>\n"
+"<ol>\n"
+"<li>Modify the fckeditor.config.js file to custom your needs (optional).<br />\n"
+"You may copy the needed configuration lines from the default FCKeditor configuration settings (modules/fckeditor/fckeditor/fckconfig.js), the lines in fckeditor.config.js will override most settings.</li>\n"
+"<li>Enable the module as usual from Drupal's admin pages.</li>\n"
+"<li>Under Administer > Settings > FCKeditor, configure the fckeditor settings. You can choose which textareas will be replaced by FCKeditor, choose the toolbars and configure some more advanced settings.</li>\n"
+"<li>Grant permissions for use of FCKeditor in Administer > User Management > Access Control (You only need to select either basic or advanced editor for each role that is allowed to use the FCKeditor)</li>\n"
+"<li>For the Rich Text Editing to work you also need to configure your !filterlink for the users that may access Rich Text Editing. Either grant those users Full HTML access or use the following: <code>!filter</code>. Users that need access to tables might be better of using Full HTML.</li>\n"
+"</ol>"
+msgstr ""
+"<h3>Configurazione</h3>\n"
+"<ol>\n"
+"<li>Modifica il file fckeditor.config.js per personalizzare le tue necessità (opzionale).<br />\n"
+"Puoi copiare le linee di configurazione che ti servono dalle impostazioni della configurazione predefinita di FCKeditor (modules/fckeditor/fckeditor/fckconfig.js), le linee in in fckeditor.config.js sovrascriveranno la maggior parte delle impostazioni.</li>\n"
+"<li>Abilita il modulo come al solito dalle pagine di amministrazione di Drupal.</li>\n"
+"<li>Sotto Amministrar > Configurazione del sito > FCKeditor, configura le impostazioni per fckeditor.Puoi scegliere quali aree di testo saranno sostituite con FCKeditor, scegliere le barre degli strumenti e configurare alcune impostazioni avanzate.</li>\n"
+"<li>Garantisci i permessi di utilizzo di FCKeditor in Amministra > Utenti > Controllo accessi (devi semplicemente selezionare l'editor di base o avanzato per ciascun ruolo cui è permesso di utilizzare FCKeditor)</li>\n"
+"<li>Per far funzionare la Modifica del Testo Formattato c'è bisogno di configurare anche i tuoi !filterlink per gli utenti che possono accedere alla Modifica del Testo Formattato. O garantisci a quegli utenti l'accesso a Full HTML o utilizza il seguente: <code>!filter</code>. Per gli utenti che hanno bisogno di utilizzare delle tabelle sarebbe meglio l'utilizzo di Full HTML.</li>\n"
+"</ol>"
+
+#: fckeditor.module:63
+msgid "filters"
+msgstr "filtri"
+
+#: fckeditor.module:65
+msgid ""
+"<h3>Uploading images and files</h3>\n"
+"<p>There are three ways of uploading files: By using the built-in file browser, by using a module like !imce or using the core upload module.</p>"
+msgstr ""
+"<h3>Caricamento di immagini e file</h3>\n"
+"<p>Ci sono tre modi di caricare i file: attraverso il file browser integrato, attraverso un modulo come !imce or utilizzando il modulo upload del core.</p>"
+
+#: fckeditor.module:68
+#: ;271
+msgid "IMCE"
+msgstr "IMCE"
+
+#: fckeditor.module:71
+msgid ""
+"<h3>Security</h3>\n"
+"<p>Note that enabling file uploads is <strong>a security risk</strong>. That's why there is a\n"
+"separate permission in Administer > User Management > Access Control for enabling the file\n"
+"browser to certain groups.</p>"
+msgstr ""
+"<h3>Sicurezza</h3>\n"
+"<p>Nota che l'abilitazione del caricamento dei file è <strong>un rischio per la sicurezza</strong>. Questo spiega perchè vi un permesso separato in Amministra > Utenti > Controllo accessi per l'abilitazione del caricamento dei file per specifici gruppi.</p>"
+
+#: fckeditor.module:118
+#: fckeditor.info:0
+msgid "FCKeditor"
+msgstr "FCKeditor"
+
+#: fckeditor.module:133
+msgid "checking for %filename"
+msgstr "Controllo per %filename"
+
+#: fckeditor.module:135
+msgid "The FCKeditor component is not installed correctly. Please go to the !fckeditorlink to download the latest version. After that you must extract the files to %modulepath and make sure that the directory %modulesubdir and the file %modulefile exist. Refer to the !readme for more information."
+msgstr "Il componente FCKeditor non è installato correttamente. Per favore vai a !fckeditorlink per scaricare la versione più recente. Fatto ciò estrai i file in %modulepath ed assicurati che la cartella %modulesubdir e il file %modulefile esistono. Fai riferimento al !readme per maggiori informazioni."
+
+#: fckeditor.module:158
+msgid "Basic settings"
+msgstr "Impostazioni di base"
+
+#: fckeditor.module:164
+msgid "Use FCKeditor in a popup window"
+msgstr "Utilizza FCKeditor in una finestra di popup"
+
+#: fckeditor.module:166
+msgid "If this option is selected a link to a popup window will be used instead of a textarea replace."
+msgstr "Se questa opzione è selezionata sarà mostrato un collegamento ad una finestra di popup con l'editor in luogo della sostituzione delle aree di testo."
+
+#: fckeditor.module:170
+msgid "Default Toolbar"
+msgstr "Barra degli strumenti predefinita"
+
+#: fckeditor.module:173
+msgid "Choose a default toolbar set for users with &quot;use default fckeditor&quot; permission.."
+msgstr "Scegli una barra degli strumenti predefinita per gli utenti con il permesso &quot;utilizza fckeditor predefinito&quot;."
+
+#: fckeditor.module:177
+msgid "Advanced Toolbar"
+msgstr "Barra degli strumenti avanzata"
+
+#: fckeditor.module:180
+msgid "Choose a toolbar set for users with &quot;use advanced fckeditor&quot; permission."
+msgstr "Scegli una barra degli strumenti predefinita per gli utenti con il permesso &quot;utilizza fckeditor avanzato&quot;."
+
+#: fckeditor.module:186
+msgid "Visibility settings"
+msgstr "Impostazioni di visibilità"
+
+#: fckeditor.module:192
+msgid "Minimum rows"
+msgstr "Numero minimo di righe"
+
+#: fckeditor.module:194
+msgid "FCKeditor will be triggered if the textarea has more rows than entered here. Enter '1' if you do not want to use this feature."
+msgstr "FCKeditor sarà avviato se l'area di testo ha più righe di quante specificate qui. Imposta '1' se non vuoi utilizzare questa funzionalità."
+
+#: fckeditor.module:198
+msgid "Use inclusion or exclusion mode"
+msgstr "Usa modalità di inclusione o esclusione"
+
+#: fckeditor.module:201
+msgid "Exclude fields, will disable the editor on all selected fields"
+msgstr "L'esclusione dei campi disabiliterà l'utilizzo dell'editor sui campi selezionati."
+
+#: fckeditor.module:202
+msgid "Include fields, will only load the editor for the selected fields"
+msgstr "L'inclusione dei campi caricherà l'editor solo sui campi selezionati."
+
+#: fckeditor.module:203
+msgid "Exclude paths, will disable the editor for all textareas at the configured paths"
+msgstr "L'esclusione dei percorsi disabiliterà l'editor per tutte le aree di testo dei percorsi configurati."
+
+#: fckeditor.module:204
+msgid "Include paths, will load the editor for all large enough textareas at the configured paths."
+msgstr "L'inclusione dei percorsi caricherà l'editor per le tutte le aree di testo abbastanza larghe che si trovano ai percorsi configurati."
+
+#: fckeditor.module:205
+msgid "Choose what to do with the following values."
+msgstr "Scegli cosa fare per i valori seguenti."
+
+#: fckeditor.module:214
+msgid "Selected fields or paths"
+msgstr "Seleziona dei campi o dei percorsi"
+
+#: fckeditor.module:218
+msgid ""
+"Enter fieldnames or drupal paths here, depending on the chosen option for the inclusion mode.<br />\n"
+"Names (HTML ID's) of fields that may or may not have an FCKeditor.<br />\n"
+"Paths may be used the same way as in the drupal blocks configuration.<br />\n"
+"You may separate the different entries by commas, spaces or newlines. You may also use * as a wildcard character.<br />\n"
+"You can not mix paths and ID's."
+msgstr ""
+"Specifica qui i nomi dei campi o i percorsi drupal, dipendentemente dalla selezione della modalità di inclusione.<br />\n"
+"I nomi (gli ID HTML) dei campi che possono o non possono utilizzare FCKEditor.<br />\n"
+"I percorsi possono essere utilizzati allo stesso modo della configurazione dei blocchi di drupal.<br />\n"
+"Puoi separare i differenti elementi con la virgola, lo spazio o con a capo. Puoi anche utilizzare * come carattere jolly.<br />\n"
+"Non puoi mischiare ID e percorsi."
+
+#: fckeditor.module:228
+msgid "Advanced settings"
+msgstr "Impostazioni avanzate"
+
+#: fckeditor.module:234
+msgid "Start the toolbar expanded"
+msgstr "Avvia la barra degli strumenti espansa"
+
+#: fckeditor.module:236
+msgid "The toolbar start expanded or collapsed."
+msgstr "La barra degli strumenti viene avviata espansa o collassata."
+
+#: fckeditor.module:240
+msgid "Width"
+msgstr "Larghezza"
+
+#: fckeditor.module:242
+msgid "Width in pixels or percent. Ex: 400 or 100%"
+msgstr "Larcghezza in pixel o percentuale. Es: 400 o 100%"
+
+#: fckeditor.module:246
+msgid "Custom stylesheet"
+msgstr "Foglio di stile personalizzato"
+
+#: fckeditor.module:248
+msgid "If you enter a path to a stylesheet here it will be used in the FCKeditor area while editing. Be advised that using the default theme stylesheet will not give the correct results."
+msgstr "Se imposti qui un percorso di un foglio di stile, questo sarà utilizzato durante la modifica all'interno di FCKeditor. Attenzione che l'utilizzo del foglio di stile predefinito del tema non darà il risultato corretto."
+
+#: fckeditor.module:256
+#: ;266
+msgid "File browser settings"
+msgstr "Impostazioni del File browser"
+
+#: fckeditor.module:259
+msgid "The file browser settings are not diplayed because you have configured IMCE to handle file browsing."
+msgstr "Le impostazioni sul browser dei file non sono mostrate poichè hai configurato IMCE per la gestione del trasferimento dei file."
+
+#: fckeditor.module:269
+msgid "Set file browser settings. If you choose none of these you will need to manage your images and other files with the core upload module or a contrib module like !imce. Please note that these options require manual configuration, check !readme for more information.<br />Also remember to change the !permissions."
+msgstr "Specifica le impostazioni del browser di file. Se scegli nessuno di queste dovrai gestire le tue immagini e gli altri file con il modulo upload del core o con un modulo addizionale come !imce. Per favore nota che queste opzioni richiedono una configurazione manuale, verifica il !readme per maggiori informazioni.<br/>Ricorda anche di cambiare i !permissions."
+
+#: fckeditor.module:280
+msgid "Allow basic file management"
+msgstr "Permette una gestione dei file di base"
+
+#: fckeditor.module:282
+msgid "Allow quick uploads. All files will be placed in the directory designated in the configuration file."
+msgstr "Permetti caricamenti veloci. Tutti i file saranno posti nella cartella specificata nel file di configurazione."
+
+#: fckeditor.module:286
+msgid "Allow advanced file management"
+msgstr "Permette una gestione dei file avanzata"
+
+#: fckeditor.module:288
+msgid "Allow file management in the advanced file manager. All files will be placed in subdirectories of the default drupal upload directory."
+msgstr "Permetti la gestione dei file tramite il gestore avanzato dei file. Tutti i file saranno posti in sottocartelle della cartella di caricamento predefinita di drupal."
+
+#: fckeditor.module:438
+msgid "Open rich editor"
+msgstr "Apri editor di testo formattato"
+
+#: fckeditor.module:91
+msgid "use default fckeditor"
+msgstr "utilizza fckeditor predefinito"
+
+#: fckeditor.module:91
+msgid "use advanced fckeditor"
+msgstr "utilizza fckeditor avanzato"
+
+#: fckeditor.module:91
+msgid "allow fckeditor file uploads"
+msgstr "permette il caricamento dei file tramite fckeditor"
+
+#: fckeditor.module:0
+msgid "fckeditor"
+msgstr "fckeditor"
+
+#: fckeditor.info:0
+msgid "Enables the usage of FCKeditor (WYSIWYG) instead of plain text fields."
+msgstr "Abilita l'utilizzo di FCKeditor (WYSIWYG) in luogo dei campi testo semplice."
+

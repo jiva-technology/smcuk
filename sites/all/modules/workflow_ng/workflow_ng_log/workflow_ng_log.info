@@ -1,0 +1,4 @@
+; $Id: workflow_ng_log.info,v 1.1.2.1 2008/01/18 19:05:05 fago Exp $
+name = Per-Entity Logs
+description = Provides per-user and per-node logs which can be written to by actions and presented using views.
+package = Workflow-ng

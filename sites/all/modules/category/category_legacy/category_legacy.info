@@ -1,0 +1,5 @@
+; $Id: category_legacy.info,v 1.1 2007/01/05 15:31:15 jaza Exp $
+name = Category legacy
+description = Allows you to convert your taxonomy and book data into category data, and vice versa.
+package = Category
+dependencies = category

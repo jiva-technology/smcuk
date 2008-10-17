@@ -1,0 +1,1 @@
+The docs for this module are changing so much that the readme keeps getting stale. See http://drupal.org/node/207776 for complete instructions.

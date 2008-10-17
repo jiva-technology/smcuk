@@ -1,0 +1,65 @@
+/* $Id: INSTALL.txt,v 1.14.2.9.2.1 2008/07/04 02:04:03 sun Exp $ */
+
+-- REQUIREMENTS --
+
+* Javascript-enabled web browser
+
+* Image module <http://drupal.org/project/image>
+
+* Wysiwyg Editor module (optional) <http://drupal.org/project/wysiwyg>
+
+
+-- PRE-REQUISITES --
+
+* If you are upgrading from a previous version, please
+
+  - follow the compatibility note on http://drupal.org/project/img_assist
+
+  - backup your files and database in front of the upgrade
+
+  - run Drupal's update.php after updating the module's files.
+    Further information: http://drupal.org/upgrade/running-update-php
+
+  - read notes about important changes that may affect your site or theme in
+    CHANGELOG.txt.
+
+  - update your theme, especially if you have any theme override functions for
+    image or img_assist.
+
+
+-- INSTALLATION --
+
+* Place the entire img_assist directory into a modules directory of your
+  choice, in most cases: sites/all/modules.
+
+* Enable the Image Assist module by navigating to:
+
+  Administer > Site building > Modules
+
+* Configure an input format and enable the filter 'Inline images' by visiting:
+
+  Administer > Site configuration > Input formats
+
+  If you want to enable Inline images for the input format 'Filtered HTML',
+  you additionally need to click the 'Configure' tab and add
+
+  <span> <img>
+
+  to the text field 'Allowed HTML tags'.
+
+* Set permissions for using Image Assist by going to:
+
+  Administer > User management > Access control
+
+* Optionally fine tune how Image Assist operates by navigating to:
+
+  Administer > Site configuration > Image assist
+
+  If Taxonomy module is enabled, you use a gallery module like Acidfree, and you
+  want your users to be able to easily choose images from their galleries, select
+  for example "Acidfree albums" as the vocabulary to use for Image assist.
+
+* If Wysiwyg Editor module is installed, you need to edit your Wysiwyg profile
+  configuration and enable the plugin for Image Assist.
+
+

@@ -1,0 +1,3 @@
+; $Id $
+name = Read Path
+description = "Creates a path of new posts for the user to follow."

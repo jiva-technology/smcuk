@@ -1,0 +1,143 @@
+<?php
+// $Id: commentactivity.module,v 1.1.2.6 2008/04/29 16:20:27 jaydub Exp $
+
+/**
+ * Activity definition file
+ *
+ * This defines what hooks activity module should use
+ */
+function commentactivity_activity_info() {
+  return array(
+    'ops' => array(
+      'insert' => t('Insert'),
+      'update' => t('Update'),
+      'delete' => t('Delete'),
+      'publish' => t('Publish'),
+      'unpublish' => t('Unpublish')
+    ),
+    'types' => array('comment' => t('Comment')),
+    'roles' => array(
+      'author' => array(
+        '#name' => t('Author'),
+        '#description' => t('The person who created the comment.'),
+        '#default' => 'You left the comment [subject] on [parent-node]',
+      ),
+      'parent_node_author' => array(
+        '#name' => t('Parent node author'),
+        '#description' => t('The person who created the node.'),
+        '#default' => '[author] commented on [parent-node]',
+      ),
+      'parent_comment_author' => array(
+        '#name' => t('Parent comment author'),
+        '#description' => t('The person who wrote the comment.'),
+        '#default' => '[author] replied to your comment [parent-comment] with [subject]',
+      ),
+      // This is what corresponds to ACTIVITY_ALL
+      'all' => array(
+        '#name' => t('All'),
+        '#description' => t('The general public.'),
+        '#default' => '[author] commented on [parent-node] saying [subject]',
+      ),
+    ),
+  );
+}
+
+/**
+ * Token module integration.
+ */
+function commentactivity_token_list($type = 'all') {
+  if ($type == 'commentactivity') {
+    $tokens['commentactivity'] = array(
+      'author' => t('Person who authored the comment'),
+      'subject' => t('The subject of the comment'),
+      'parent-node'  => t('Link to the parent node'),
+      'parent-node-author' => t('Person who authored the parent node'),
+      'parent-node-type' => t('The type of the parent node'),
+      'parent-comment-author' => t('Person who authored the parent comment'),
+      'parent-comment' => t('The parent comment'),
+    );
+
+    return $tokens;
+  }
+}
+
+function commentactivity_token_values($type, $data = NULL, $options = array()) {
+  static $authors;
+  if ($type == 'commentactivity' && !empty($data)) {
+    if (!isset($authors[$data['author-uid']])) {
+    $user = db_fetch_object(db_query('SELECT uid, name FROM {users} WHERE uid = %d',  $data['author-uid']));
+      $authors[$data['author-uid']] = theme('username', $user);
+    }
+    $data['author'] = $authors[$data['author-uid']];
+    return $data;
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi()
+ */
+function commentactivity_comment($a1, $op) {
+  switch ($op) {
+    case 'insert':
+    case 'update':
+      if ($a1['status'] == 1) {
+        break;
+      }
+    case 'delete':
+      if ($a1->status == 1) {
+        break;
+      }
+    case 'publish':
+    case 'unpublish':
+/*
+    $a1:
+    [cid] => 2  // the new comment id
+    [pid] => 1  // the parent comment id
+    [nid] => 1 // the parent node id
+    [uid] => 1 // the author id.
+*/
+        $a1 = (array) $a1;
+        $node = node_load($a1['nid']);
+        $node_author = db_fetch_object(db_query('SELECT uid, name FROM {users} WHERE uid = %d', $node->uid));
+        if ($a1['pid']) {
+          if ($parent_comment_author_uid = db_result(db_query("SELECT uid FROM {comments} WHERE cid = %d", $a1['pid']))) {
+            $parent_comment_author = user_load(array('uid' => $parent_comment_author_uid));
+            $parent_comment = db_result(db_query("SELECT subject FROM {comments} WHERE cid = %d", $a1['pid']));
+          }
+        }
+
+        // This is all the information you'll need later in order to build
+        // the activity message.
+        $user = user_load(array('uid' => $a1['uid']));
+        $data = array(
+          'author-uid' => $user->uid,
+          'subject' => l($a1['subject'], 'node/'. $node->nid, array(), NULL, 'comment-'. $a1['cid']),
+          'parent-node' => l($node->title, 'node/'. $node->nid),
+          'parent-node-author' => theme('username', $node_author),
+          'parent-node-type' => $node->type,
+        );
+
+        $target_users_roles = array();
+        // The order in which elements are added to $target_users_roles is
+        // important. Since several of the roles can be the same person
+        // eg. a person comments on their own node or replies to their own
+        // comment, they may overwrite each other in the array.
+        // This is fine as long as the most important role wins...
+        if (is_object($parent_comment_author)) {
+          $data['parent-comment'] = $parent_comment;
+          $data['parent-comment-author'] = theme('username', $parent_comment_author);
+          $target_users_roles[$parent_comment_author_uid] = 'parent comment author';
+        }
+
+        $target_users_roles = array(
+          ACTIVITY_ALL => 'all',
+          $node->uid => 'parent node author',
+          // and the most important role is 'author' so we add it last.
+          $a1['uid'] => 'author',
+        );
+
+        activity_insert('commentactivity', 'comment', $op, $data, $target_users_roles);
+
+      break;
+  }
+}

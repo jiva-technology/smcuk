@@ -1,0 +1,876 @@
+<?php
+// $Id: workflow_owner.module,v 1.4.2.6 2008/04/28 02:49:29 jacobsingh Exp $ workflow_owner.module,v 0
+
+/**
+ * Implementation of hook_perm().
+ */
+function workflow_owner_perm() {
+  return array('update workflow owner', 'access views tab');
+}
+
+/**
+ * Implementation of hook_help()
+ */
+function workflow_owner_help($section) {
+  switch ($section) {
+    case 'admin/build/workflow-owner':
+      return t('Set the default owners of the state "Awaiting Translation Review" for each language.');
+  }
+}
+
+/**
+ * Implementation of hook_menu()
+ */
+function workflow_owner_menu($may_cache = false) {
+  $items = array();
+  if ($may_cache) {
+    $items[] = array(
+    'path' => 'workflow_owner/autocomplete',
+    //TODO: include workflow state to/from filtering so non-authorized users can't get ownership (because they can't pass it).
+    'callback' => 'workflow_owner_autocomplete',
+    'access' => user_access('update workflow owner'),
+    'type' => MENU_CALLBACK,
+    );
+
+    $items[] = array(
+    'path' => 'admin/build/workflow_owner/state/default',
+    'callback' => 'drupal_get_form',
+    'callback arguments' => array ('workflow_owner_state_default_form'),
+    'access' => user_access('administer workflow'),
+    'type' => MENU_CALLBACK,
+    );
+
+
+  }
+  elseif (arg(0) == 'user') {
+    $items[] = array(
+    'path' => 'user/'. arg(1) .'/workflow',
+    'title' => t('Workflows owned'),
+    'callback' => 'workflow_owner_view',
+    'callback arguments' => array(arg(1)),
+    'access' => user_access('access views tab'),
+    'type' => MENU_LOCAL_TASK,
+    );
+  }
+  elseif (arg(0) == 'node' && is_numeric(arg(1))) {
+    $node = node_load(arg(1));
+    $wid = workflow_get_workflow_for_type($node->type);
+    if ($wid) { // workflow exists for this type
+      global $user;
+      $roles = array_keys($user->roles);
+      if ($node->uid == $user->uid) {
+        $roles = array_merge(array('author'), $roles);
+      }
+      $workflow = db_fetch_object(db_query("SELECT * FROM {workflows} WHERE wid = %d", $wid));
+      $allowed_roles = $workflow->tab_roles ? explode(',', $workflow->tab_roles) : array();
+      $items[] = array(
+      'path' => "node/$node->nid/workflow_owners",
+      'title'    => t('Workflow Owners'),
+      'access'   => array_intersect($roles, $allowed_roles) || user_access('administer nodes'),
+      'type'     => MENU_LOCAL_TASK,
+      'weight'   => 2,
+      'callback' => 'workflow_owner_tab_page',
+      'callback arguments' => arg(1),
+      );
+    }
+  } else {
+    $access = user_access('administer workflow');
+    $items[] = array('path' => 'admin/build/workflow',
+    'title'    => t('Workflow'),
+    'access'   => $access,
+    'callback' => 'workflow_owner_workflow_overview_override',
+    'description' => t('Allows the creation and assignment of arbitrary workflows to node types.'));
+
+  }
+  return $items;
+}
+
+
+/**
+ * Retrieve a pipe delimited string of autocomplete suggestions for 
+ * existing users who can make at least 1 trx from the state being selected
+ */
+function workflow_owner_autocomplete($sid,$string = '') {
+  $matches = array();
+  if (!$string) {
+    //$matches['asas'] = $_GET['q'];
+    print drupal_to_js($matches);
+    exit();
+  }
+  if (!$sid) {
+    exit();
+  }
+
+
+  $auth_okay = workflow_allowable_transitions($sid,'from',array(2));
+  if (count($auth_okay) < 2) {
+    $auth_okay = false;
+  }
+
+  if ($auth_okay) {
+    $result = db_query_range("SELECT u.name FROM {users} u WHERE LOWER(name) LIKE LOWER('%s%%')", $string, 0, 10);
+  } else {
+
+    $cache_key = 'workflow_states_allowed_trx_roles:' . $sid;
+    $workflow_states_allowed_trx_roles = cache_get($cache_key,'cache');
+    $valid_roles = $workflow_states_allowed_trx_roles->data;
+    if (!$workflow_states_allowed_trx_roles) {
+      $wid = db_result(db_query('SELECT wid from {workflow_states} WHERE sid = %d',$sid));
+      if (!$wid) {
+        exit();
+      }
+
+      $roles = user_roles();
+      $workflow = db_fetch_object(db_query("SELECT * FROM {workflows} WHERE wid = %d", $wid));
+      $allowed_roles = $workflow->tab_roles ? explode(',', $workflow->tab_roles) : array();
+      $roles = array_intersect($allowed_roles,array_keys($roles));
+
+      foreach ($roles as $rid) {
+        if ($_trx = workflow_allowable_transitions($sid,'from',array($rid)) ) {
+          if (count($_trx) > 1 ) {
+            $_valid_roles[] = $rid;
+          }
+        }
+      }
+
+    $valid_roles = implode(",",$_valid_roles);    
+    cache_set($cache_key,'cache',$valid_roles,CACHE_TEMPORARY);    
+    }
+    
+    $result = db_query_range("SELECT u.name FROM {users} u LEFT JOIN {users_roles} ur ON u.uid = ur.uid WHERE ( ur.rid IN($valid_roles) OR u.uid = 1 ) AND LOWER(name) LIKE LOWER('%s%%')", $string, 0, 10); 
+  }
+
+  while ($user = db_fetch_object($result)) {
+    $matches[$user->name] = check_plain($user->name);
+  }
+  print drupal_to_js($matches);
+  exit();
+}
+
+
+/**
+ * Implementation of hook_nodeapi()
+ */
+function workflow_owner_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+
+  if(($op=="insert" || $op=="update") && isset($node->state_owners) && is_array($node->state_owners)) {
+    $edit = array (
+    'state_owners' => $node->state_owners,
+    'nid' => $node->nid,
+    );
+    workflow_owner_form_submit('workflow_owner_form',$edit);
+
+    return;
+
+    if (!$user->uid){     
+      continue;
+    }
+  }
+  
+  if ($op == 'delete') {
+    db_query('DELETE from {workflow_state_owner} WHERE nid = %d', $node->nid);
+  }
+}
+
+/**
+ * Implementation of hook_form_alter()
+ */
+function workflow_owner_form_alter($form_id, &$form) {
+  if (isset($form['type']) && $form['type']['#value'] .'_node_form' == $form_id) {
+    $wid = workflow_get_workflow_for_type($form['type']['#value']);
+    if($wid) {
+      $node = $form['#node'];
+      $workflow_owner_form = workflow_owner_form($wid,$node->nid);
+      if (arg(1) == 'add') {
+
+        $default_owners = workflow_owner_get_default_owners();
+        foreach($workflow_owner_form['state_owners'] as $id => $elem) {
+          if (!is_numeric($id)) {
+            //This is retarded... would love to see a proper iterator object in FAPI.
+            continue;
+          }
+          if (!$workflow_owner_form['state_owners'][$id]['#default_value'] && $default_owners[$id]) {
+            $workflow_owner_form['state_owners'][$id]['#default_value'] = $default_owners[$id]->name;
+            $workflow_owner_form['state_owners'][$id]['#title'] .= t(' <em>(as default) </em>');
+          }
+        }
+      }
+
+      $form += $workflow_owner_form;
+
+      $form['state_owners']['#validate'] = array('workflow_owner_form_validate_nodeapi' => array());
+      return $form;
+    }
+  }
+  
+  if ($form_id == 'workflow_edit_form') {
+    $form['#submit'] = array('workflow_owner_clear_autocomplete_cache' => '');
+  }
+}
+
+
+/**
+ * Sets the default owners for a node.
+ *
+ * @param unknown_type $nid
+ * @return unknown
+ */
+function workflow_owner_set_defaults_on_node($nid) {
+  
+  if ($node = node_load($nid) ) {
+    if ($wid = workflow_get_workflow_for_type($node->type) ) {      
+      $states = workflow_get_states($wid);
+      $default_owners = workflow_owner_get_default_owners();      
+      foreach ($states as $sid => $state) {        
+        if (isset($default_owners[$sid])) {          
+          workflow_owner_set_owner($sid,$nid,$default_owners[$sid]->uid);
+        }
+      }
+      return true;
+    }
+  }
+  
+}
+
+/**
+ * Autocomplete cache to cut down on queries
+ *
+ * @param unknown_type $form_id
+ * @param unknown_type $edit
+ */
+function workflow_owner_clear_autocomplete_cache($form_id,$edit) {
+  if ($wid = $edit['wid']) {
+    $states = workflow_get_states($wid);
+    foreach ($states as $sid => $state) {      
+      cache_clear_all('workflow_states_allowed_trx_roles','cache',true);
+    }
+  }
+}
+
+/**
+ * Return the workflow form
+ */
+function workflow_owner_tab_page($nid){
+  $node = node_load($nid);
+  drupal_set_title(check_plain($node->title));
+  $wid = workflow_get_workflow_for_type($node->type);
+  $states = workflow_owner_get_state_owners($wid,$nid);
+
+  $form = workflow_owner_form($wid,$node->nid);
+  $form['submit'] = array (
+  '#type' => 'submit',
+  '#value' => "Save",
+  '#weight' => 10,
+  );
+  $output .= drupal_get_form('workflow_owner_tab_form', $wid, $node->nid);
+  return $output;
+}
+
+/**
+ * Workflow Owner Tab form
+ */
+function workflow_owner_tab_form($wid,$nid) {
+  $form = array();
+  $form = workflow_owner_form($wid,$nid);
+  $form['state_owners']['#collapsed'] = false;
+  $form['submit'] = array (
+  '#type' => 'submit',
+  '#value' => "Save",
+  '#weight' => 10,
+  );
+  return $form;
+}
+
+function workflow_owner_form_validate_nodeapi(&$form) {
+  workflow_owner_form_validate('workflow_owner_form',$form['#post']);
+}
+
+function workflow_owner_form_validate($form_id, $edit) {
+
+  if (is_array($edit['state_owners'])) {
+    foreach ($edit['state_owners'] as $id => $uname) {
+      if (!$uname) {
+        continue;
+      }
+      $q = "SELECT uid from {users} WHERE name = '%s'";
+      $dbr_uid = db_query($q,$uname);
+      $user = db_fetch_object($dbr_uid);
+      if (!$user->uid){
+        form_set_error("state_owners][$id",'Not a valid user: '. $uname);
+        //drupal_set_message("Not a valid user: $uname","error");
+        $errors = true;
+      }
+    }
+  }
+  if ($errors) {
+    return;
+  }
+}
+
+/**
+ * Workflow Owner Form submitted
+ */
+function workflow_owner_form_submit($form_id, $edit) {
+  foreach ($edit['state_owners'] as $id => $uname) {
+    if (!$uname) {
+      db_query("DELETE FROM {workflow_state_owner} WHERE sid=%d AND nid=%d LIMIT 1", $id, $edit['nid']);
+      continue;
+    }
+    $q = "SELECT uid from {users} WHERE name = '%s'";
+    $dbr_uid = db_query($q,$uname);
+    $user = db_fetch_object($dbr_uid);
+    if (!$user->uid){
+      drupal_set_message("Not a valid user: $uname","error");
+      continue;
+    }
+    workflow_owner_set_owner($id,$edit['nid'],$user->uid) ;
+  }
+  if ($form_id == 'workflow_owner_tab_form') {
+    drupal_set_message("Workflow owners have been updated.");
+  }
+}
+
+function workflow_owner_form($wid,$nid = null) {
+
+  $states = workflow_owner_get_state_owners($wid,$nid);
+  if (!$states) {
+    return array();
+  }
+
+  $form = array();
+  $form['#base'] = 'workflow_owner_form';
+  $form['state_owners'] = array(
+  '#type' => 'fieldset',
+  '#title' => t('State Owners'),
+  '#weight' => 5,
+  '#tree' => true,
+  '#collapsible' => TRUE,
+  '#collapsed' => TRUE,
+  );
+
+  $form['nid'] = array (
+  '#type' => 'value',
+  '#value' => $nid,
+  );
+
+  $user_access = user_access("update workflow owner");
+
+  foreach($states as $id => $state) {
+    $form['state_owners'][$id] = array (
+    '#title' => $state['state'] . ' owner',
+    '#type' => $user_access ? "textfield" : "item",
+    );
+    if ($user_access) {
+      $form['state_owners'][$id]['#default_value'] = $state['owner_name'];
+      $form['state_owners'][$id]['#autocomplete_path'] = '/workflow_owner/autocomplete/' . $id . '/';
+    } else {
+      $form['state_owners'][$id]['#value'] = $state['owner_name'];
+    }
+  }
+
+  if(empty($form['state_owners'][1]['#default_value'])) {
+    global $user;
+    $form['state_owners'][1]['#default_value'] = $user->name;
+  }
+
+  return $form;
+}
+
+/**
+ * Form for settting defaul owners
+ *
+ * @param unknown_type $wid
+ * @param unknown_type $sid
+ * @return unknown
+ */
+function workflow_owner_state_default_form($wid,$sid) {
+  $form = array();
+  $owners = workflow_owner_get_default_owners();
+
+  $state = workflow_get_state($sid);
+  drupal_set_title(t('Set default owner for @state', array ('@state' => $state['state'])));
+
+  $user = $owners[$sid];
+
+  $form['default_owner'] = array (
+  '#type' => 'textfield',
+  '#title' => t('Default Owner'),
+  '#description' => t('Default owner for this state'),
+  '#autocomplete_path' => '/workflow_owner/autocomplete/' . $sid,
+  '#default_value' => $user->name,
+  );
+
+  $form['submit'] = array(
+  '#type'   => 'submit',
+  '#value'  => t('Submit'),
+  );
+
+  $form['sid'] = array (
+  '#type' => 'hidden',
+  '#value' => $sid,
+  );
+
+  return $form;
+
+}
+
+function workflow_owner_state_default_form_validate($form_id,$form_values) {
+
+  $uid = db_result(db_query("SELECT uid from {users} WHERE name LIKE '%s'",$form_values['default_owner']));
+  if (!$uid) {
+    form_set_error('default_owner','User entered does not exist');
+  }
+}
+
+function workflow_owner_state_default_form_submit($form_id,$form_values) {
+  $owners = workflow_owner_get_default_owners(false);
+
+  if ($form_values['sid']) {
+    if (!$form_values['default_owner']) {
+      unset($owners['sid']);
+    } else {
+      $uid = db_result(db_query("SELECT uid from {users} WHERE name LIKE '%s'",$form_values['default_owner']));
+      $owners[$form_values['sid']] = $uid;
+    }
+  }
+
+  workflow_owner_set_default_owners($owners);
+  drupal_set_message("Default Owner Set");
+  drupal_goto('admin/build/workflow');
+
+}
+
+/**
+ * Get the default owners
+ *
+ * @param unknown_type $with_names
+ * @return unknown
+ */
+function workflow_owner_get_default_owners($with_names = true) {
+  //variable_set('workflow_owner_default_owners',array());
+  if ($owners = variable_get('workflow_owner_default_owners',array()) ) {
+    if (!$with_names) {
+      return $owners;
+    }
+
+    $res = db_query('SELECT uid,name from users WHERE uid IN (%s)',implode(',',$owners));
+    while ($row = db_fetch_object($res)) {
+      $users[$row->uid] = new stdClass();
+      $users[$row->uid]->uid = $row->uid;
+      $users[$row->uid]->name = $row->name;
+    }
+    foreach ($owners as $sid => $uid) {
+      $output[$sid] = $users[$uid];
+    }
+  }
+
+  return $output;
+}
+
+function workflow_owner_set_default_owners($owners) {
+  variable_set('workflow_owner_default_owners',$owners);
+}
+
+
+/**
+ * Fetch current state owners
+ */
+function workflow_owner_get_state_owners($wid, $nid = null) {
+  $states = array();
+  $dbr_all_states = db_query("SELECT ws.sid, ws.state FROM
+  {workflow_states} ws   
+  WHERE ws.wid = %d ORDER BY weight, state", intval($wid), intval($nid));
+
+  while ($data = db_fetch_object($dbr_all_states)) {
+    $states[$data->sid] =
+    array(
+    "state" => $data->state,
+    "owner" => '',
+    'owner_name' => '',
+    'owner_mail' => '',
+    );
+  }
+
+  if (!$nid) {
+    return $states;
+  }
+  $dbr_owners = db_query("SELECT ws.sid, state, wso.uid as owner, u.name as owner_name, u.mail as owner_mail FROM
+  {workflow_states} ws LEFT JOIN {workflow_state_owner} wso ON ws.sid = wso.sid
+  LEFT JOIN {users} u ON wso.uid = u.uid 
+  WHERE ws.wid = %d AND wso.nid = %d ORDER BY weight, state", intval($wid), intval($nid));
+
+  while ($data = db_fetch_object($dbr_owners)) {
+    $states[$data->sid] =
+    array(
+    "state" => $data->state,
+    "owner" => $data->owner,
+    'owner_name' => $data->owner_name,
+    'owner_mail' => $data->owner_mail,
+    );
+  }
+
+  return $states;
+}
+
+/**
+ * Set state owner
+ */
+function workflow_owner_set_owner($sid,$nid,$uid) {
+  $q = "SELECT * FROM {workflow_state_owner} WHERE nid=%d AND sid=%d";
+  $dbr_existing = db_query($q,$nid,$sid,$uid);
+  if (db_fetch_object($dbr_existing)) {
+    $q = "UPDATE {workflow_state_owner} SET uid=%d WHERE sid=%d AND nid=%d";
+    $dbr_updated = db_query($q,$uid,$sid,$nid);
+  } else {
+    $q = "INSERT INTO {workflow_state_owner} (nid,sid,uid) VALUES (%d,%d,%d)";
+    $dbr_insert = db_query($q,$nid,$sid,$uid);
+  }
+}
+
+
+
+/**
+ * @see workflow_overview
+ *
+ * @return unknown
+ */
+function workflow_owner_workflow_overview_override() {
+  $workflows = workflow_get_all();
+  $row = array();
+
+  foreach ($workflows as $wid => $name) {
+    $links = array(
+    'workflow_overview_add_state' => array(
+    'title' => t('Add state'),
+    'href' => "admin/build/workflow/state/$wid"),
+    'workflow_overview_actions' => array(
+    'title' => t('Actions'),
+    'href' => "admin/build/workflow/actions/$wid"),
+    'workflow_overview_edit' => array(
+    'title' => t('Edit'),
+    'href' => "admin/build/workflow/edit/$wid"),
+    'workflow_overview_delete' => array(
+    'title' => t('Delete'),
+    'href' => "admin/build/workflow/delete/$wid"),
+    );
+
+    $states = workflow_get_states($wid);
+    if (!(module_exists('actions') && $states)) {
+      unset($links['workflow_overview_actions']);
+    }
+
+    $row[] = array($name, theme('links', $links));
+    $subrows = array();
+
+    $default_owners = workflow_owner_get_default_owners();
+    foreach ($states as $sid => $statename) {
+      $user = null;
+      $user = $default_owners[$sid];
+
+      if (!workflow_is_system_state(t($statename))) {
+        $statelinks = array(
+        'workflow_overview_edit_state' => array (
+        'title' => t('Edit'),
+        'href' => "admin/build/workflow/state/$wid/$sid",
+        ),
+        'workflow_overview_delete_state' => array(
+        'title' => t('Delete'),
+        'href' => "admin/build/workflow/state/delete/$wid/$sid"
+        ),
+        'workflow_owner_state_default' => array(
+        'title' => $user->name ? t('Default Owner (@current_default_owner)', array ('@current_default_owner' => $user->name)) : t('Default Owner'),
+        'href' => "admin/build/workflow_owner/state/default/$wid/$sid"),
+        );
+      }
+      $subrows[] = array(t($statename), theme('links', $statelinks));
+      unset ($statelinks);
+    }
+
+    $subheader_state      = array('data' => t('State'), 'style' => 'width: 30%');
+    $subheader_operations = array('data' => t('Operations'), 'style' => 'width: 70%');
+    $subheader_style      = array('style' => 'width: 100%; margin: 3px 20px 20px;');
+    $subtable = theme('table', array($subheader_state, $subheader_operations), $subrows, $subheader_style);
+
+    $row[] = array(array('data' => $subtable, 'colspan' => '2'));
+  }
+
+  if ($row) {
+    $output = theme('table', array(t('Workflow'), t('Operations')), $row);
+  }
+  else {
+    $output = '<p>' . t('No workflows have been added. Would you like to <a href="@link">add a workflow</a>?', array('@link' => url('admin/build/workflow/add'))) . '</p>';
+  }
+
+  $output .= drupal_get_form('workflow_types_form');
+
+  return $output;
+}
+
+
+/**
+ * View Related Stuff
+ */
+
+
+/**
+ * Display the workflow_owner view
+ */
+function workflow_owner_view($uid) {
+  if(user_access('access views tab')) {
+    $view_args = array($uid);
+    $view_name = 'workflow_owner';
+    $view = views_get_view($view_name);
+    return views_build_view('embed', $view, $view_args);
+  }
+  else {
+    return "Access denied";
+  }
+}
+
+
+/**
+ * Implementation of hook_views_tables()
+ */
+function workflow_owner_views_tables() {
+  $tables = array();
+  $table = array(
+  'name' => 'workflow_state_owner',
+  'join' => array(
+  'left' => array(
+  'table' => 'node',
+  'field' => 'nid',
+  ),
+  'right' => array(
+  'field' => 'nid',
+  ),
+  ),
+  );
+  $tables[$table['name']] = $table;
+  $table = array(
+  'name' => 'workflow_node',
+  'join' => array(
+  'type' => 'inner',
+  'left' => array(
+  'table' => 'workflow_state_owner',
+  'field' => 'sid',
+  ),
+  'right' => array(
+  'field' => 'sid',
+  ),
+  ),
+  );
+  $tables[$table['name']] = $table;
+  return $tables;
+}
+
+/**
+ * Views field filters
+ */
+function workflow_owner_views_filters($field) {
+  $options = array(
+  '#type' => 'select',
+  '#options' => array('one', 'two', 'three'),
+  );
+  $operator = array(
+  '='  => t('is equal to'),
+  '!=' => t('is not equal to'),
+  );
+  $filters = array(
+  'workflow_node' => array(
+  'name' => t('Workflow status'),
+  'operator' => $operator,
+  'option' => $options,
+  'help' => t('Filter by workflow state.'),
+  ),
+  );
+  return $filters;
+}
+
+/**
+ * Implementation of hook_views_arguments()
+ */
+function workflow_owner_views_arguments() {
+  $arguments = array(
+  'workflow_owner' => array(
+  'name' => t('Workflow: owner'),
+  'handler' => 'workflow_owner_handler_arg_uid',
+  'help' => t('Allow users to filter a view by workflow owner.'),
+  ),
+  );
+  return $arguments;
+}
+
+/**
+ * Handler to deal with sid as an argument.
+ */
+function workflow_owner_handler_arg_uid($op, &$query, $argtype, $arg = '') {
+  switch($op) {
+    case 'summary':
+      $query->add_table('workflow_state_owner', TRUE);
+      $query->add_field('uid', 'workflow_state_owner');
+      $query->add_field('sid', 'workflow_node');
+      $query->add_where('workflow_state_owner.uid != "" AND workflow_state_owner.sid = workflow_node.sid AND workflow_node.nid = node.nid');
+      $fieldinfo['field'] = "workflow_state_owner.uid";
+      return $fieldinfo;
+      break;
+    case 'filter':
+      $query->add_table('workflow_state_owner', TRUE);
+      $query->add_table('workflow_node', TRUE);
+      if (is_numeric($arg)) {
+        // user uid is provided, which is entered in the workflow_state_owner table
+        $query->add_where("workflow_state_owner.uid = %d  AND workflow_state_owner.sid = workflow_node.sid AND workflow_node.nid = node.nid", $arg);
+        $query->add_groupby('nid', 'node');
+      }
+      else {
+        // user name is provided, we need to check for uid in users table
+        $query->add_table('users', TRUE, 1, array('left' => array('table' => 'workflow_state_owner', 'field' => 'uid'), 'right' => array('field' => 'uid')));
+        $query->add_where("workflow_state_owner.uid = users.uid AND users.name='%s'  AND workflow_state_owner.sid = workflow_node.sid AND workflow_node.nid = node.nid	", $arg);
+        $query->add_groupby('nid', 'node');
+      }
+      break;
+    case 'link':
+      $user = user_load(array('uid'=>$query->uid));
+      return l($user->name, "$arg/$query->uid"); // $arg/$user->name is also possible, but query will take longer then
+    case 'title':
+      $state = db_fetch_object(db_query("SELECT uid FROM {workflow_state_owner} WHERE uid=%d", $query));
+      return $state->uid;
+  }
+}
+
+/**
+ * Implementation of hook_token_values()
+ */
+function workflow_owner_token_values($type, $object = NULL) {
+
+  switch ($type) {
+    case 'node':
+    case 'workflow':
+      $node = (object)$object;
+      $wid = workflow_get_workflow_for_type($node->type);
+
+      // cast to an object just in case fussy drupal gave us an array
+      $node = (object)$object;
+
+      if ($wid) {
+        $states = workflow_get_states($wid);
+      } else {
+        break;
+      }
+
+      $result = db_query_range("SELECT h.* FROM {workflow_node_history} h WHERE nid = %d ORDER BY stamp DESC",$node->nid,0,1);
+
+      if ($row = db_fetch_object($result)) {
+        $account = user_load( array ('uid' => $row->uid));
+        $comment = $row->comment;
+      }
+
+      $state_owners = workflow_owner_get_state_owners($wid,$node->nid);
+
+      if ($state_owners[$row->sid]) {
+        $values['workflow-current-state-owner-name']            =  $state_owners[$row->sid]['owner_name'];
+        $values['workflow-current-state-owner-mail']            =  $state_owners[$row->sid]['owner_mail'];
+        //fill in the user info for state owner of the new state
+      }
+      else {
+        $values['workflow-current-state-owner-name']            =  " ";
+        $values['workflow-current-state-owner-mail']            =  " ";
+      }
+      if ($state_owners[$row->old_sid]) {
+        $values['workflow-old-state-owner-name']                =  $state_owners[$row->old_sid]['owner_name'];
+        $values['workflow-old-state-owner-mail']                =  $state_owners[$row->old_sid]['owner_mail'];
+        // fill in the user info for state owner of the old state
+      }
+      else {
+        $values['workflow-old-state-owner-name']                =  " ";
+        $values['workflow-old-state-owner-mail']                =  " ";
+      }
+
+      break;
+  }
+
+  return $values;
+}
+
+/**
+ * Implementation of hook_token_list()
+ */
+function workflow_owner_token_list($type = 'all') {
+
+  if ($type == 'workflow' || $type == 'node' || $type == 'all') {
+
+    $tokens['workflow']['workflow-current-state-owner-name']                 = 'Username of Owner of Current State';
+    $tokens['workflow']['workflow-current-state-owner-mail']                 = 'E-mail of Owner of Current State';
+    $tokens['workflow']['workflow-old-state-owner-name']                     = 'Username of Owner of Last State';
+    $tokens['workflow']['workflow-old-state-owner-mail']                     = 'E-mail of Owner of Last State';
+    $tokens['node'] = $tokens['workflow'];
+  }
+  return $tokens;
+}
+
+
+function workflow_owner_views_default_views() {
+
+  $view = new stdClass();
+  $view->name = 'workflow_owner';
+  $view->description = '';
+  $view->access = array (
+  0 => '2',
+  );
+  $view->view_args_php = '';
+  $view->page = TRUE;
+  $view->page_title = '';
+  $view->page_header = '';
+  $view->page_header_format = '1';
+  $view->page_footer = '';
+  $view->page_footer_format = '1';
+  $view->page_empty = '';
+  $view->page_empty_format = '1';
+  $view->page_type = 'table';
+  $view->url = '';
+  $view->use_pager = TRUE;
+  $view->nodes_per_page = '10';
+  $view->sort = array (
+  );
+  $view->argument = array (
+  array (
+  'type' => 'workflow_owner',
+  'argdefault' => '1',
+  'title' => '',
+  'options' => '',
+  'wildcard' => '',
+  'wildcard_substitution' => '',
+  ),
+  );
+  $view->field = array (
+  array (
+  'tablename' => 'node',
+  'field' => 'title',
+  'label' => 'Title',
+  'handler' => 'views_handler_field_nodelink',
+  'options' => 'link',
+  ),
+  array (
+  'tablename' => 'node',
+  'field' => 'created',
+  'label' => 'Created',
+  'handler' => 'views_handler_field_date_small',
+  ),
+  array (
+  'tablename' => 'workflow_states',
+  'field' => 'state',
+  'label' => 'State',
+  ),
+  array (
+  'tablename' => 'workflow_node_history',
+  'field' => 'comment',
+  'label' => 'Comment',
+  ),
+  );
+  $view->filter = array (
+  );
+  $view->exposed_filter = array (
+  );
+  $view->requires = array(node, workflow_states, workflow_node_history);
+  $views[$view->name] = $view;
+  return $views;
+}

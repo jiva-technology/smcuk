@@ -1,0 +1,5 @@
+; $Id: workflow_workflow_ng.info,v 0
+name = Workflow - Workflow NG Integration
+description = Fire workflow_ng events on workflow state changes
+dependencies = workflow workflow_ng
+package = Workflow

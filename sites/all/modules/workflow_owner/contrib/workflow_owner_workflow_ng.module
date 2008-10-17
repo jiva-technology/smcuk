@@ -1,0 +1,99 @@
+<?php
+function workflow_owner_workflow_ng_configuration() {
+  
+  if (module_exists('workflow_owner')) {
+    
+    $conf['send_mail_to_new_state_owner'] =
+      array (
+        '#type' => 'configuration',
+        '#altered' => false,
+        '#event' => 'workflow_transition_post',
+        '#label' => 'Send Mail to new owner',
+        '#active' => 0,
+        '#module' => 'workflow-ng',
+        0 => 
+        array (
+          '#type' => 'condition',
+          '#name' => 'workflow_ng_condition_token_compare',
+          '#negate' => 1,
+          '#settings' => 
+          array (
+            'text1' => '[state:workflow-current-state-owner-name]',
+            'text1_args' => 
+            array (
+              0 => 'state',
+            ),
+            'text2' => '[state:workflow-old-state-owner-name]',
+            'text2_args' => 
+            array (
+              0 => 'state',
+            ),
+            'regex' => 0,
+          ),
+        ),
+        1 => 
+        array (
+          '#type' => 'condition',
+          '#name' => 'workflow_ng_condition_token_compare',
+          '#settings' => 
+          array (
+            'text1' => '[node:workflow-name]',
+            'text1_args' => 
+            array (
+              0 => 'node',
+            ),
+            'text2' => '.+',
+            'text2_args' => 
+            array (
+            ),
+            'regex' => 1,
+          ),
+        ),
+        2 => 
+        array (
+          '#type' => 'action',
+          '#name' => 'workflow_ng_action_drupal_message',
+          '#settings' => 
+          array (
+            'message' => 'Mail has been sent to [state:workflow-current-state-owner-name], notifying them of their ownership of [node:title]',
+            'message_args' => 
+            array (
+              0 => 'node',
+              1 => 'state',
+            ),
+            'error' => 0,
+          ),
+        ),
+        3 => 
+        array (
+          '#type' => 'action',
+          '#name' => 'workflow_ng_action_mail',
+          '#settings' => 
+          array (
+            'to' => '[state:workflow-current-state-owner-mail]',
+            'to_args' => 
+            array (
+              0 => 'state',
+            ),
+            'from' => '[state:workflow-old-state-owner-mail]',
+            'from_args' => 
+            array (
+              0 => 'state',
+            ),
+            'subject' => 'You are now the owner of [node:title]',
+            'subject_args' => 
+            array (
+              0 => 'node',
+            ),
+            'message' => 'Please go to http://[node:site-url]/node/[node:nid] to view it and edit.',
+            'message_args' => 
+            array (
+              0 => 'node',
+            ),
+          ),
+        ),
+        '#name' => 'cfg_1',
+      ); 
+    }
+  }
+  ?>

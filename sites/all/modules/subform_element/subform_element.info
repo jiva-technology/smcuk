@@ -1,0 +1,3 @@
+; $Id: subform_element.info,v 1.1.2.1 2007/06/18 23:07:05 dww Exp $
+name = Subform Element
+description = Provides a new form element that makes reusing other forms easy

@@ -1,0 +1,22 @@
+<?php
+// $Id: buddylistactivity.install,v 1.1.2.3 2008/04/29 16:56:30 jaydub Exp $
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function buddylistactivity_uninstall() {
+  // Remove any activity entries from the buddylistactivity module
+  if (module_exists('activityhistory')) {
+    db_query("DELETE FROM {activity_history} WHERE aid IN (SELECT aid FROM {activity} WHERE module = '%s')", 'buddylistactivity');
+  }
+  db_query("DELETE FROM {activity_targets} WHERE aid IN (SELECT aid FROM {activity} WHERE module = '%s')", 'buddylistactivity');
+  db_query("DELETE FROM {activity} WHERE module = '%s'", 'buddylistactivity');
+
+  // Delete any variables that have been set.
+  // We don't just DELETE FROM {variable}, even though we could.
+  $result = db_query("SELECT name FROM {variable} WHERE name LIKE 'buddylistactivity_%'");
+  // Instead we use the API, because API's can change!
+  while ($row = db_fetch_object($result)) {
+    variable_del($row->name);
+  }
+}

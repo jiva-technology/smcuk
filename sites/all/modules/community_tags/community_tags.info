@@ -1,0 +1,5 @@
+; $Id: community_tags.info,v 1.1.2.1 2007/11/14 00:23:33 owahab Exp $
+name = Community Tags
+description = "Allows users to 'tag' other users' content. Weighted tag lists or 'tag clouds' are generated for each piece of content to show the popularity of tags."
+dependencies = tagadelic
+package = "Taxonomy"

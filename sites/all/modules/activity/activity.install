@@ -1,0 +1,110 @@
+<?php
+// $Id: activity.install,v 1.1.2.1.2.6 2008/04/14 16:59:20 jaydub Exp $
+
+/**
+ * @file
+ * Install file for activity module.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function activity_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("
+        CREATE TABLE {activity} (
+          aid int(11) NOT NULL,
+          module varchar(50) NOT NULL default '',
+          type varchar(25) NOT NULL default '',
+          operation varchar(25) NOT NULL default '',
+          created int(11) NOT NULL,
+          data longtext NOT NULL,
+          PRIMARY KEY (aid),
+          KEY (module),
+          KEY (created)
+        ) /*!40100 DEFAULT CHARACTER SET UTF8 */
+      ");
+      db_query(
+        "CREATE TABLE {activity_targets} (
+          aid int(11) NOT NULL,
+          target_uid int(11) NOT NULL,
+          target_role varchar(50) NOT NULL default '',
+          PRIMARY KEY (aid, target_uid),
+          KEY (target_uid, target_role),
+          KEY (target_role)
+        ) /*!40100 DEFAULT CHARACTER SET UTF8 */
+      ");
+      db_query("ALTER TABLE {variable} CHANGE `name` `name` varchar(128) NOT NULL DEFAULT ''");
+      break;
+    case 'pgsql':
+      db_query("
+        CREATE TABLE {activity} (
+          aid int NOT NULL,
+          module varchar(50) NOT NULL default '',
+          type varchar(25) NOT NULL default '',
+          operation varchar(25) NOT NULL default '',
+          created int NOT NULL,
+          data text NOT NULL,
+          PRIMARY KEY (aid)
+        )");
+
+      db_query("CREATE INDEX {activity}_module_idx ON {activity} (module)");
+      db_query("CREATE INDEX {activity}_created_idx ON {activity} (created)");
+      db_query("CREATE SEQUENCE {activity}_seq");
+
+      db_query(
+        "CREATE TABLE {activity_targets} (
+          aid int NOT NULL,
+          target_uid int NOT NULL,
+          target_role varchar(50) NOT NULL default '',
+          PRIMARY KEY (aid, target_uid)
+        )");
+      db_query("CREATE INDEX {activity_targets}_target_uid_target_role_idx ON {activity_targets} (target_uid, target_role)");
+      db_query("CREATE INDEX {activity_targets}_target_role_idx ON {activity_targets} (target_role)");
+      db_query("ALTER TABLE {variable} ALTER COLUMN name TYPE varchar(128)");
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function activity_uninstall() {
+  if (db_table_exists('activity')) {
+    db_query("DROP TABLE {activity}");
+  }
+  if (db_table_exists('activity_targets')) {
+    db_query("DROP TABLE {activity_targets}");
+  }
+  switch ($GLOBALS['db_type']) {
+    case 'pgsql':
+      db_query("DROP SEQUENCE {activity}_seq");
+      break;
+  }
+}
+
+function activity_update_1() {
+  $ret = array();
+  switch($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql('ALTER TABLE {activity} ADD PRIMARY KEY (aid)');
+      $ret[] = update_sql('ALTER TABLE {activity} ADD KEY (uid)');
+      $ret[] = update_sql('ALTER TABLE {activity} ADD KEY (module)');
+      break;
+  }
+  return $ret;
+}
+
+/**
+ * Increase the variable name column length to the Drupal 6 default of 128
+ * characters.
+ */
+function activity_update_2() {
+  $ret = array();
+  $ret[] = update_sql("ALTER TABLE {variable} CHANGE `name` `name` varchar(128) NOT NULL DEFAULT ''");
+  return $ret;
+}
+

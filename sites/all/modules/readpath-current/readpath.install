@@ -1,0 +1,42 @@
+<?php
+// $Id$
+
+function readpath_install() {
+
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("CREATE TABLE {readpath_ignored_nodes} (
+          uid int unsigned NOT NULL default '0',
+          nid int unsigned NOT NULL default '0'
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */;");
+
+      db_query("CREATE TABLE {readpath_ignored_terms} (
+          uid int unsigned NOT NULL default '0',
+          tid int unsigned NOT NULL default '0',
+          status int unsigned NOT NULL default '0'
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */;");
+      break;
+
+    case 'pgsql':
+      db_query("CREATE TABLE {readpath_ignored_nodes} (
+          uid integer NOT NULL default '0',
+          nid integer NOT NULL default '0'
+        )");
+
+      db_query("CREATE TABLE {readpath_ignored_terms} (
+          uid integer NOT NULL default '0',
+          tid integer NOT NULL default '0',
+          status integer NOT NULL default '0'
+        )");
+      break;
+  }
+  
+}
+
+function readpath_uninstall() {
+  db_query('DROP TABLE IF EXISTS {readpath_ignored_nodes}');
+  db_query('DROP TABLE IF EXISTS {readpath_ignored_terms}');
+  variable_del('readpath_types');
+}
+

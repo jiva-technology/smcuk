@@ -1,0 +1,286 @@
+<?php
+// $Id: simpletest.module,v 1.22.2.4 2007/08/16 20:23:26 rokZlender Exp $
+
+/**
+ * Implementation of hook_help().
+ */
+function simpletest_help($section) {
+  $output = '';
+
+  switch ($section) {
+    case 'admin/modules#description':
+      $output = t("Simple unit testing suite");
+      break;
+    case 'admin/settings/simpletest':
+      $output = '';
+      break;
+  }
+
+  return $output;
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function simpletest_menu($may_cache) {
+  if ($may_cache) {
+    $items = array();
+    $items[] = array('path' => 'admin/build/simpletest', 
+                     'title' => 'Simpletest unit testing',
+                     'callback' => 'simpletest_entrypoint',
+                     'description' => t('Run tests against Drupal core and your active modules. These tests help assure that your site code is working as designed.'),
+                     'access' => user_access('administer unit tests'));
+    $items[] = array('path' => 'admin/settings/simpletest', 
+      'title' => t('Simpletest settings'), 
+      'description' => t('Configure unit testing framework.'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => 'simpletest_settings',
+      'access' => user_access('administer unit tests')
+    );
+    return $items;
+  }
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function simpletest_perm() {
+  return array('administer unit tests'); 
+}
+
+/**
+ * Try to load the simepletest
+ * @return boolean TRUE if the load succeeded
+ */
+function simpletest_load() {
+  static $loaded;
+  if ($loaded) {
+    return true; 
+  }
+  global $user;
+  if ($user->uid != 1) {
+    drupal_set_message(t('We strongly suggest running the simpletests with uid=1!'));
+  }
+  
+  $loaded = true;
+  if (!defined('SIMPLE_TEST')) {
+    define('SIMPLE_TEST', drupal_get_path('module', 'simpletest'). '/simpletest'); 
+  } 
+  if (!is_dir(SIMPLE_TEST)){
+    $output = t('Sorry but the simpletest cannot be found in the current installation. Please notice that simpletest.module needs Simpletest framework. '
+              . 'Please download it from !simpletest_link and place it into the same directory as simpletest.module: %simpletest_directory',
+                array('!simpletest_link' => l('Simpletest on SourceForge', 'https://sourceforge.net/project/showfiles.php?group_id=76550'),
+                      '%simpletest_directory' => SIMPLE_TEST));
+    drupal_set_message($output, 'error');
+    return false;
+  }
+  
+  /* We currently use only the web tester that DrupalTestCase is built upon */
+  require_once(SIMPLE_TEST . '/web_tester.php');
+  require_once(SIMPLE_TEST . '/reporter.php');
+  require_once('drupal_reporter.php');
+ 
+  if (version_compare(SimpleTest::getVersion() , '1.0.1beta2') < 0) {
+    $output = t('Due to a lot of refactoring done on simpletest library side. Simpletest module is not compatible with simpeltest versions lower thab 1.0.1beta2. '
+              . 'Please download the latest version from !simpletest_link and place it into the same directory as simpletest.module: %simpletest_directory',
+                array('!simpletest_link' => l('Simpletest on SourceForge', 'https://sourceforge.net/project/showfiles.php?group_id=76550'),
+                      '%simpletest_directory' => SIMPLE_TEST));
+    drupal_set_message($output, 'error');
+    return false;
+  }
+  
+
+  
+  $path = drupal_get_path('module', 'simpletest'). '/';
+  require_once($path . 'drupal_test_case.php');
+  require_once($path . 'drupal_unit_tests.php');
+  return true;
+}
+
+
+/**
+ * Menu callback for both running tests and listing possible tests
+ */
+function simpletest_entrypoint() {
+  if (!simpletest_load()) {
+    /**
+     * @todo find a better way for this return,
+     * currently needed to show error, true leads to page not found
+     */
+    return '&nbsp;';  
+  }  
+  drupal_add_js(drupal_get_path('module', 'simpletest') . '/simpletest.js', 'module');
+  $output = drupal_get_form('simpletest_overview_form');
+	
+  print theme('page',  simpletest_running_output() . $output);
+}
+
+function simpletest_running_output($output = NULL) {
+  static $o;
+  if ($output != NULL) {
+    $o = $output;
+  }
+  return $o;
+}
+
+/**
+ * FAPI form submit for simpletest_overview_form
+ *
+ * @param $form_id 
+ * @param $form_values
+ */
+function simpletest_overview_form_submit($form_id, $form_values) {
+  
+  switch ($form_values['running_options']){
+    
+    case 'all_tests':
+      $output  = simpletest_run_tests();
+    break;    
+    
+    case 'selected_tests':
+      $test_list = array();
+      foreach ($form_values as $item => $value){
+        if ($value == 1 && strpos($item, 'selectall') === FALSE) {
+          $tests_list[] = $item;
+        }
+      }
+      if (count($tests_list) > 0 ) {
+				$output = simpletest_run_tests($tests_list);
+			}
+			else { 
+				// no test has been selected
+				drupal_set_message(t('No test has been selected.'), 'error');
+			}
+    break;  
+    
+    default:
+      drupal_set_message(t('No test has been selected.'), 'error');
+  }
+  
+  simpletest_running_output($output);
+  return FALSE;
+}
+
+/**
+ * Create simpletest_overview_form 
+ */
+function simpletest_overview_form() {
+  $output = array();
+  
+  $total_test = &simpletest_get_total_test();
+   
+  $test_instances = $total_test->getTestInstances();
+
+  foreach ($test_instances as $group_test) {
+    $group = array();
+    $tests = $group_test->getTestInstances();
+    $group_class = str_replace(' ', '-', strtolower($group_test->getLabel()));
+    $group['tests'] = array(
+      '#type' => 'fieldset',
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+      '#title' => 'Tests',
+      '#attributes' => array('class' => $group_class), 
+    );
+    foreach($tests as $test) {
+      $test_info = $test->get_info();
+      $desc = $test_info['desc'];
+      $group['tests'][get_class($test)] = array('#type' => 'checkbox', '#title' => $test_info['name'], '#default_value' => 0,
+                                                   '#description' => $desc);
+      
+    }
+
+    $output[] = array_merge($group,
+                    array('#type' => 'fieldset', '#collapsible' => FALSE, '#collapsed' => FALSE,
+                          '#title' => $group_test->getLabel(), '#attributes' => array('class' => 'select_all')));
+  }
+  
+  $submit['running_options'] = array('#type' => 'radios', '#default_value' => 'selected_tests', 
+                    '#options' => array('all_tests' => t('Run all tests (WARNING, this may take a long time)'), 'selected_tests' => t('Run selected tests')));
+  $submit['op'] = array('#type' => 'submit', '#value' => t('Begin'));
+  $output[] = array_merge($submit,
+                  array('#type' => 'fieldset', '#collapsible' => FALSE, '#collapsed' => FALSE, '#title' => 'Run tests'));
+  return $output;
+}
+
+
+/**
+ * Actually runs tests
+ * @param array $testlist list of tests to run or DEFAULT NULL run all tests
+ */
+function simpletest_run_tests($testlist = NULL) {
+  global $test_running;
+  if (!$test_running) {
+    $test_running = TRUE;
+    $test = simpletest_get_total_test($testlist);
+    if (SimpleReporter::inCli()) {
+      cache_clear_all();
+      exit ($test->run(new TextReporter()) ? 0 : 1);
+    }
+    //$reporter = &new HtmlReporter();
+    $reporter = &new DrupalReporter();
+    cache_clear_all();
+    $test->run($reporter);
+//    exit;
+    $test_running = FALSE;
+    return $reporter->getOutput();
+  }
+}
+
+/**
+ * Implementation of hook_simpletest().
+ */
+function simpletest_simpletest() {
+	$dir = drupal_get_path('module', 'simpletest'). '/tests';
+	$tests = file_scan_directory($dir, '\.test$');
+  return array_keys($tests);
+}
+
+/**
+ * This function makes sure no unnecesary copies of the DrupalUnitTests object are instantiated
+ * @param  array $classes list of all classes the test should concern or
+ *                        DEFAULT NULL
+ * @return DrupalUnitTests object
+ */
+function &simpletest_get_total_test($classes = NULL) {
+  static $total_test;
+  if (!$total_test) {
+    if (!simpletest_load()) {
+      return FALSE; 
+    }
+    $total_test = &new DrupalUnitTests();
+  }
+  if (!is_null($classes)) {
+    return new DrupalUnitTests($classes);
+  }
+  return $total_test;
+}
+
+
+function simpletest_settings() {
+  $from = array();
+
+  $form['http_auth'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('HTTP authentication'),
+    '#description' => t('If needed, enter a username and password for reaching your web site. This is not a drupal username/password. This
+    is a login presented by your web server. Most sites may leave section empty.'));
+  $form['http_auth']['simpletest_httpauth'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Use http authentication'),
+    '#default_value' => variable_get('simpletest_httpauth', false)
+  );
+  $form['http_auth']['simpletest_httpauth_username'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Username'),
+    '#default_value' => variable_get('simpletest_httpauth_username', '')
+  );
+  $form['http_auth']['simpletest_httpauth_pass'] = array(
+    '#title' => t('Password'),
+    '#type' => 'password',
+    '#default_value' => variable_get('simpletest_httpauth_pass', '')
+  );
+  
+  return system_settings_form($form);
+
+}

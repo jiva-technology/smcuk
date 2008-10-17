@@ -1,0 +1,5 @@
+; $Id: activeedit.info,v 1.1.2.3 2007/08/08 21:26:07 nedjo Exp $
+name =  Activeedit
+description = Provides AJAX-based in place editing.
+package = Javascript tools
+dependencies = jstools formfilter

@@ -1,0 +1,5 @@
+; $Id: parser_simplepie.info,v 1.1.2.8 2008/04/11 19:46:34 aronnovak Exp $
+name = SimplePie parser
+description = "Provides an XML parser for FeedAPI modules. Uses SimplePie library. Requires SimplePid 1.01+."
+package = FeedAPI Default
+dependencies = feedapi

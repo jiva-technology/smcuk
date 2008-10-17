@@ -1,0 +1,69 @@
+<?php
+// $Id: category_display.install,v 1.5 2006/04/14 13:52:03 jaza Exp $
+
+/**
+ * @file
+ * Update file for the category_display module. All functions in this
+ * file are implementations of hook_update_N(), unless indicated otherwise.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function category_display_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("CREATE TABLE {category_display} (
+        cid int(10) unsigned NOT NULL default '0',
+        toc_for_cats tinyint(3) unsigned NOT NULL default '0',
+        toc_depth tinyint(4) NOT NULL default '0',
+        toc_nodecount tinyint(3) unsigned NOT NULL default '0',
+        navlinks tinyint(3) unsigned NOT NULL default '0',
+        navlinks_before tinyint (3) unsigned NOT NULL default '0',
+        navlinks_after tinyint (3) unsigned NOT NULL default '0',
+        desc_as_body tinyint (3) unsigned NOT NULL default '0',
+        nodelinks tinyint(3) unsigned NOT NULL default '0',
+        emptymsg tinyint(3) unsigned NOT NULL default '0',
+        show_listing tinyint(3) unsigned NOT NULL default '0',
+        PRIMARY KEY (cid)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */
+      ");
+      break;
+    case 'pgsql':
+      db_query("CREATE TABLE {category_display} (
+        cid integer NOT NULL default '0',
+        toc_for_cats smallint NOT NULL default '0',
+        toc_depth smallint NOT NULL default '0',
+        toc_nodecount smallint NOT NULL default '0',
+        navlinks smallint NOT NULL default '0',
+        navlinks_before smallint NOT NULL default '0',
+        navlinks_after smallint NOT NULL default '0',
+        desc_as_body smallint NOT NULL default '0',
+        nodelinks smallint NOT NULL default '0',
+        emptymsg smallint NOT NULL default '0',
+        show_listing smallint NOT NULL default '0',
+        PRIMARY KEY (cid)
+      )");
+      break;
+  }
+}
+
+function category_display_update_1() {
+  $ret[] = update_sql('ALTER TABLE {category_display} ADD navlinks_before tinyint(3) unsigned NOT NULL default \'0\' AFTER navlinks');
+  $ret[] = update_sql('ALTER TABLE {category_display} ADD navlinks_after tinyint(3) unsigned NOT NULL default \'0\' AFTER navlinks_before');
+
+  return $ret;
+}
+
+function category_display_update_2() {
+  $ret[] = update_sql('ALTER TABLE {category_display} ADD toc_nodecount tinyint(3) unsigned NOT NULL default \'0\' AFTER toc_depth');
+
+  return $ret;
+}
+
+function category_display_update_3() {
+  $ret[] = update_sql('ALTER TABLE {category_display} ADD desc_as_body tinyint(3) unsigned NOT NULL default \'0\' AFTER navlinks_after');
+
+  return $ret;
+}

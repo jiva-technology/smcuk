@@ -1,0 +1,5 @@
+; $Id: buddylistactivity.info,v 1.1.2.1 2007/12/23 18:57:26 robertDouglass Exp $
+name = Buddylist activity
+description = Enable activity notifications for buddylist.
+dependencies = activity buddylist
+package = Activity

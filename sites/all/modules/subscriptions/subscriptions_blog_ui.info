@@ -1,0 +1,5 @@
+; $Id: subscriptions_blog_ui.info,v 1.1.2.1 2007/12/26 17:24:22 chx Exp $
+name = Blog Subscriptions UI
+description = Provides a separate blogs subscriptions page.
+package = "Subscriptions"
+dependencies = subscriptions subscriptions_content blog

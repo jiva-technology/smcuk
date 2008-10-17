@@ -1,0 +1,65 @@
+# LANGUAGE translation of Drupal (category_views.module)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from file: category_views.module,v 1.2 2006/03/13 21:53:04 jaza
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"POT-Creation-Date: 2006-03-14 02:23-0600\n"
+"PO-Revision-Date: YYYY-mm-DD HH:MM+ZZZZ\n"
+"Last-Translator: NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <EMAIL@ADDRESS>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: category_views.module:15
+msgid "Renders node listings on category pages using a view. Requires the category module and the views module."
+msgstr ""
+
+#: category_views.module:16
+msgid "<p>The category_views module renders node listings on category pages using a view. It requires the category module and the views module to be installed.</p>"
+msgstr ""
+
+#: category_views.module:66;105
+msgid "Category view settings"
+msgstr ""
+
+#: category_views.module:70;109
+msgid "none"
+msgstr ""
+
+#: category_views.module:72;111
+msgid "This container's page"
+msgstr ""
+
+#: category_views.module:73;112
+msgid "Pages for categories in this container"
+msgstr ""
+
+#: category_views.module:77;116
+msgid "View for this container"
+msgstr ""
+
+#: category_views.module:81;119
+msgid "The view to use for rendering listings of assigned nodes, in this container and its categories. If you do not check either of the 'show view on' boxes below, then it makes no difference whether or not you select a view here. Conversely, if you leave this setting at its default value (&lt;none&gt;), then it makes no difference whether or not you check either of the boxes below. If there are no views available, or if the currently available views are not adequate, you can %create-view (<em>warning:</em> clicking this link may cause you to leave this page, and to lose whatever information you have entered so far)."
+msgstr ""
+
+#: category_views.module:81;119
+msgid "create a new view"
+msgstr ""
+
+#: category_views.module:85;123
+msgid "Show view on"
+msgstr ""
+
+#: category_views.module:88;125
+msgid "Whether to use this view for rendering assigned node listings on this container's page, and/or on pages for categories in this container. The node listing will be passed to the view renderer, instead of to the default category module renderer."
+msgstr ""
+
+#: category_views.module:0
+msgid "category_views"
+msgstr ""
+

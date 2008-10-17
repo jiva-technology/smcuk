@@ -1,0 +1,5 @@
+; $Id: collapsiblock.info,v 1.1.2.3 2007/08/08 21:26:09 nedjo Exp $
+name =  Collapsiblock
+description = Makes blocks collapsible.
+package = Javascript tools
+dependencies = jstools

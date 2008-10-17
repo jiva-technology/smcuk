@@ -1,0 +1,5 @@
+; $Id: workflow_ng.info,v 1.1.2.3 2007/11/13 21:16:44 fago Exp $
+name = Workflow-ng
+description = Next generation workflows for Drupal
+dependencies = token
+package = Workflow-ng

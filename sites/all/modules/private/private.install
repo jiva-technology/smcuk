@@ -1,0 +1,29 @@
+<?php
+// $Id: private.install,v 1.1.2.1 2007/01/10 04:31:57 eaton Exp $
+
+function private_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("
+          CREATE TABLE {private} (
+            nid int(10) unsigned NOT NULL default '0' PRIMARY KEY,
+            private int,
+            KEY private_nid (nid)
+          ) /*!40100 DEFAULT CHARACTER SET utf8 */;
+      ");
+      break;
+    case 'pgsql':
+      db_query("
+          CREATE TABLE {private} (
+            nid int NOT NULL default '0',
+            private int,
+            PRIMARY KEY (nid));
+      ");
+      break;
+  }
+}
+
+function private_uninstall() {
+  db_query('DROP TABLE {private}');
+}

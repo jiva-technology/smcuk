@@ -1,0 +1,5 @@
+; $Id: ajaxsubmit.info,v 1.1.2.4 2007/08/08 21:26:09 nedjo Exp $
+name =  AJAX submit
+description = Makes designated forms submit via AJAX.
+package = Javascript tools
+dependencies = jstools form_store

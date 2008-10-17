@@ -1,0 +1,4 @@
+; $Id: workflow.info,v 1.2.2.2 2007/06/18 23:07:16 dww Exp $
+name = Workflow
+description = Allows the creation and assignment of arbitrary workflows to node types.
+package = "Workflow"

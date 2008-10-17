@@ -1,0 +1,110 @@
+<?php
+// $Id: category_pathauto.module,v 1.2 2007/01/05 15:31:16 jaza Exp $
+
+/**
+ * @file
+ * Allows you to generate URL aliases that conform to your site's category
+ * structure.
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function category_pathauto_help($section) {
+  switch ($section) {
+    case 'admin/help#category_pathauto':
+      return t('<p>The category pathauto module allows you to generate URL aliases that conform to your site\'s category structure.</p><p>This module requires the category module and the pathauto module.</p>');
+  }
+}
+
+/**
+ * Implementation of hook_pathauto_node().
+ */
+function category_pathauto_pathauto_node($op, $node = NULL) {
+  switch ($op) {
+    case 'placeholders':
+      $placeholders = array();
+      $placeholders[t('[container]')] =
+        t('For category nodes, the container of the category.');
+      $placeholders[t('[categorypath]')] =
+        t('For category or container nodes, as [title], but including its supercategories.');
+      $placeholders[t('[containerfirst]')] =
+        t('The container that the page\'s first assigned category belongs to.');
+      $placeholders[t('[categoryfirst]')] =
+        t('The page\'s first assigned category.');
+      $placeholders[t('[categorypathfirst]')] =
+        t('As [categoryfirst], but including its supercategories.');
+      return $placeholders;
+    case 'values':
+      $results = category_pathauto_get_placeholders($node);
+      return $results;
+    default:
+      break;
+  }
+}
+
+/**
+ * Generate the category placeholders.
+ *
+ * @param $node
+ *   The node object generate placeholders for.
+ *
+ * @return
+ *   An array with relevant placeholders.
+ */
+function category_pathauto_get_placeholders($node) {
+  $placeholders = array();
+
+  if (category_is_cat_or_cont($node->nid)) {
+    if (!empty($node->cnid)) {
+      $cont = category_get_container($node->cnid);
+      $placeholders[t('[container]')] = pathauto_cleanstring($cont->title);
+    }
+    else {
+      $placeholders[t('[container]')] = '';
+    }
+
+    $path = _category_pathauto_get_path($node);
+    $placeholders[t('[categorypath]')] = implode('/', $path);
+  }
+  else {
+    $placeholders[t('[container]')] = '';
+    $placeholders[t('[categorypath]')] = '';
+  }
+
+  if (!empty($node->category)) {
+    $cid = reset($node->category);
+    if (!is_numeric($cid)) {
+      $cid = $cid->cid;
+    }
+    $cat = category_get_category($cid);
+    $parents = category_get_parents($cat->cid, 'cid', TRUE);
+    $cat->parent = reset($parents);
+    $cat->parent = isset($cat->parent->cid) ? $cat->parent->cid : 0;
+    $cont = category_get_container($cat->cnid);
+
+    $placeholders[t('[containerfirst]')] = pathauto_cleanstring($cont->title);
+    $placeholders[t('[categoryfirst]')] = pathauto_cleanstring($cat->title);
+
+    $path = _category_pathauto_get_path($cat, $node->title);
+    $placeholders[t('[categorypathfirst]')] = implode('/', $path);
+  }
+
+  return $placeholders;
+}
+
+function _category_pathauto_get_path($node, $title = NULL) {
+  $path = category_location($node);
+  $catpath = array();
+
+  foreach ($path as $cat) {
+    $catpath[] = $cat->title;
+  }
+
+  if (isset($title)) {
+    $catpath[] = $node->title;
+  }
+  $catpath[] = isset($title) ? $title : $node->title;
+
+  return array_map('pathauto_cleanstring', $catpath);
+}

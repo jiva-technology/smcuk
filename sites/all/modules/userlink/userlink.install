@@ -1,0 +1,24 @@
+<?php
+// $Id: userlink.install,v 1.2 2007/01/27 22:23:35 marcp Exp $
+
+/**
+ * Implementation of hook_install()
+ */
+function userlink_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("CREATE TABLE {userlink} (
+        nid int(10) unsigned NOT NULL default '0',
+        vid int(10) unsigned NOT NULL default '0',
+        url varchar(255) NOT NULL default '',
+        private int(2) NOT NULL default '0',
+        PRIMARY KEY (nid, vid)
+      ) TYPE=MyISAM /*!40100 DEFAULT CHARACTER SET utf8 */;");
+      break;
+    case 'pgsql':
+      break;
+  }
+  
+  drupal_set_message(t('Userlink has created the required tables.'));
+}

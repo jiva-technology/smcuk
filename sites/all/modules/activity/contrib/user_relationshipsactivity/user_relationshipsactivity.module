@@ -1,0 +1,171 @@
+<?php
+// $Id: user_relationshipsactivity.module,v 1.1.2.8 2008/03/19 17:47:47 sirkitree Exp $
+
+/**
+ * Activity definition file
+ *
+The User Relationships API:
+
+The module also invokes a "user_relationships" hook passing in the following argumens:
+  $type will be a string of the following
+    $type     | $category               | Description
+    ----------------------------------------------------------------------
+    insert    | type                    | before a new relationship type is created
+    update    | type                    | before a relationship type is updated
+    delete    | type                    | after a relationship type is deleted
+    load      | type                    | after a relationship type is loaded (so you can add data to it if you'd like)
+
+    load      | NULL                    | after a relationship is loaded
+    pre-save  | request|update|approve  | before a new relationship is created, updated or approved
+    post-save | request|update|approve  | after a new relationship is created, updated or approved
+    delete    | remove                  | when a relationship is removed
+    delete    | cancel                  | when a relationship request is cancelled
+    delete    | disapprove              | when a relationship request is disapprove
+    
+
+  $relationship either the relationship_type or relationship object
+
+ * This defines what hooks activity module should use
+ */
+function user_relationshipsactivity_activity_info() {
+  $types = user_relationships_types_load();
+
+  foreach ($types as $type) {
+    $token_types[$type->name] = $type->name;
+  }
+  if (count($token_types) == 0) {
+    drupal_set_message(t('There are no relationships defined. Please define some !user_relationships before configuring the activity messages.', array('!user_relationships' => l(t('user relationships'), 'admin/user/relationships'))));
+  }
+  return array(
+    'ops' => array('requested' => t('Requested'), 'approved' => t('Approved'), 'denied' => t('Denied'), 'canceled' => t('Canceled'), 'deleted' => t('Deleted')),
+    'types' => $token_types,
+    'roles' => array(
+      // This is what corresponds to ACTIVITY_ALL
+      'all' => array(
+        '#name' => t('All (approved relationships only)'),
+        '#description' => t('The general public.'),
+        '#default' => '[x-is-blah-of-y]',
+      ),
+// TODO: there should be a #defaults array instead and the keys could be
+// the ops. So for every role there is #defaults with 'requested' => 'default message' etc.
+      'requester' => array(
+        '#name' => t('Requester'),
+        '#description' => t('The person who initiated the relationship.'),
+        '#default' => t('You have requested to be [relationship-plural] with [requestee]'),
+      ),
+
+      'requestee' => array(
+        '#name' => t('Requestee'),
+        '#description' => t('The person with whom a relationship has been requested or created.'),
+        '#default' => t('[requester] has requested to be [relationship-plural] with you'),
+      ),
+    ),
+  );
+}
+
+
+/**
+ * Token module integration.
+ */
+function user_relationshipsactivity_token_list($type = 'all') {
+  if ($type == 'user_relationshipsactivity') {
+    $tokens['user_relationshipsactivity'] = array(
+      'requester-name' => t('Person who issued the request'),
+      'requester-id' => t('User id of the person who issued the request'),
+      'requester-link' => t('Link to person who issued the request'),
+      'requestee-name' => t('Person to whom the request was issued'),
+      'requestee-id' => t('User id of the person to whom the request was issued'),
+      'requestee-link' => t('Link to person who received the request'),
+      'relationship' => t('The name of the relationship'),
+      'relationship-plural' => t('The plural name of the relationship'),
+      'x-is-blah-of-y' => t('Eg: Sam is a fan of Susan'),
+      'x-and-y-are-blahs' => t('Eg: Sam and Susan are friends'),
+      'the-other-person-name' => t('In any relationship, the name of the person who is not "you". Should only be used in messages visible to the individual user.'),
+      'the-other-person-link' => t('In any relationship, a link to the person who is not "you". Should only be used in messages visible to the individual user.'),
+    );
+
+    return $tokens;
+  }
+}
+
+function user_relationshipsactivity_token_values($type, $data = NULL, $options = array()) {
+  static $requesters;
+  static $requestees;
+  if ($type == 'user_relationshipsactivity' && !empty($data)) {
+    if (!isset($requesters[$data['requester-uid']])) {
+    $requester = new stdClass();
+    $requester->uid = $data['requester-uid'];
+    $requester->name = db_result(db_query("SELECT name FROM {users} WHERE uid = %d", $data['requester-uid']));
+      $requesters[$data['requester-uid']] = array('uid' => $requester->uid, 'name' => $requester->name, 'link' => theme('username', $requester));
+    }
+    if (!isset($requestees[$data['requestee-uid']])) {
+    $requestee = new stdClass();
+    $requestee->uid = $data['requestee-uid'];
+    $requestee->name = db_result(db_query("SELECT name FROM {users} WHERE uid = %d", $data['requestee-uid']));
+      $requestees[$data['requestee-uid']] = array('uid' => $requestee->uid, 'name' => $requestee->name, 'link' => theme('username', $requestee));
+    }
+    $tokens = array(
+      'requester' => $requesters[$data['requester-uid']]['link'],
+      'requestee' => $requestees[$data['requestee-uid']]['link'],
+      'x-is-blah-of-y' => t('!sam is a @fan of !susan', array('!sam' => $requesters[$data['requester-uid']]['link'], '@fan' => $data['relationship'], '!susan' => $requestees[$data['requestee-uid']]['link'])),
+      'x-and-y-are-blahs' => t('!sam and !susan are @friends', array('!sam' => $requesters[$data['requester-uid']]['link'], '!susan' => $requestees[$data['requestee-uid']]['link'], '@friends' => $data['relationship-plural'])),
+    );
+    return $tokens + $data;
+  }
+}
+
+
+function user_relationshipsactivity_user_relationships($op, $relationship, $category = NULL) {
+  if ($category == 'type') {
+    return;
+  }
+
+  $type = $relationship->name;
+
+  $data = array(
+    'requester-uid'         => $relationship->requester_id,
+    'requestee-uid'         => $relationship->requestee_id,
+    'relationship'          => $relationship->name,
+    'relationship-plural'   => $relationship->plural_name,
+    'relationship-approved' => $relationship->approved,
+  );
+
+  $target_users_roles = array(
+    $relationship->requester_id => 'requester',
+    $relationship->requestee_id => 'requestee',
+  );
+
+  switch ($op) {
+//'ops' => array('requested' => t('Requested'), 'approved' => t('Approved'), 'denied' => t('Denied'), 'canceled' => t('Canceled'), 'deleted' => t('Deleted')),
+    case 'post-save':
+      if ($relationship->approved) {
+        $operation = 'approved';
+        $target_users_roles[ACTIVITY_ALL] = 'all';
+      }
+      else {
+        $operation = 'requested';
+      }
+    break;
+
+    case 'delete':
+      switch ($category) {
+        case 'remove':
+          $operation = 'deleted';
+          $target_users_roles[ACTIVITY_ALL] = 'all';
+        break;
+
+        case 'cancel':
+         $operation = 'canceled';
+        break;
+
+        case 'disapprove':
+          $operation = 'denied';
+        break;
+      }
+    break;
+
+  }
+
+  activity_insert('user_relationshipsactivity', $type, $operation, $data, $target_users_roles);
+}
+

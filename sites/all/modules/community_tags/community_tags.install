@@ -1,0 +1,84 @@
+<?php
+// $Id: community_tags.install,v 1.7.2.2 2007/08/01 22:38:49 unconed Exp $
+
+/**
+ * Implementation of hook_install().
+ */
+function community_tags_install() {
+  $status = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $status[] = db_query("CREATE TABLE {community_tags} (
+        tid int(10) unsigned NOT NULL DEFAULT '0',
+        nid int(10) unsigned NOT NULL DEFAULT '0',
+        uid int(10) unsigned NOT NULL DEFAULT '0',
+        date int(10) unsigned NOT NULL DEFAULT '0',
+        PRIMARY KEY  (tid,nid,uid),
+        KEY tid (tid),
+        KEY nid (nid),
+        KEY uid (uid)
+      ) /*!40100 DEFAULT CHARACTER SET utf8 */;");
+      break;
+
+    case 'pgsql':
+      $status[] = db_query("CREATE TABLE {community_tags} (
+        tid integer NOT NULL DEFAULT '0',
+        nid integer NOT NULL DEFAULT '0',
+        uid integer NOT NULL DEFAULT '0',
+        date integer NOT NULL DEFAULT '0',
+        PRIMARY KEY (tid,nid,uid)
+      );");
+      $status[] = db_query("CREATE INDEX {community_tags}_tid_idx ON {community_tags} (tid);");
+      $status[] = db_query("CREATE INDEX {community_tags}_nid_idx ON {community_tags} (nid);");
+      $status[] = db_query("CREATE INDEX {community_tags}_uid_idx ON {community_tags} (uid);");
+      break;
+  }
+
+  // Drop module weight so we act after taxonomy.
+  $weight = (int)db_result(db_query("SELECT weight FROM {system} WHERE name = 'taxonomy'"));
+  db_query("UPDATE {system} SET weight = %d WHERE name = 'community_tags'", $weight + 1);
+
+  // If there is one FALSE value in the status array, there was an error.
+  if (array_search(FALSE, $status) !== FALSE) {
+    drupal_set_message(t('Table installation for the Community Tags module was unsuccessful. The tables may need to be installed by hand.'), 'error');
+  }
+  else {
+    drupal_set_message(t('Community Tags module installed successfully.'));
+  }
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function community_tags_uninstall() {
+  db_query('DROP TABLE {community_tags}');
+}
+
+/**
+ * Update: Add tid column key.
+ */
+function community_tags_update_1() {
+  $items = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $items[] = update_sql('ALTER TABLE {community_tags} ADD KEY tid (tid)');
+      break;
+
+    case 'pgsql':
+      $items[] = update_sql("CREATE INDEX {community_tags}_tid_idx ON {community_tags} (tid);");
+      break;
+  }
+
+  community_tags_rehash(TRUE);
+
+  return $items;
+}
+
+/**
+ * Implementation of hook_enable().
+ */
+function community_tags_enable() {
+  community_tags_rehash();
+}

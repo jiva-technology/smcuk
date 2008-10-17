@@ -1,0 +1,16 @@
+/* $Id: category.css,v 1.3 2006/04/14 11:40:21 jaza Exp $ */
+
+#category td.category, #category td.message {
+  padding-left: 1.5em;
+}
+.category-first-parent {
+  font-style: italic;
+}
+.category-wrapper-installed {
+  font-weight: bold;
+  color: #008000;
+}
+.category-wrapper-notinstalled {
+  font-weight: bold;
+  color: #f00;
+}

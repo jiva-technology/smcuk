@@ -1,0 +1,5 @@
+; $Id: visualize_backtrace.info,v 1.1.2.1 2007/10/23 21:30:37 kentbye Exp $
+name = Visualize Backtrace
+description = Parses XDebug function call trace files into flowchart visualizations
+version = "$Name: DRUPAL-5--1-1 $"
+package = Development

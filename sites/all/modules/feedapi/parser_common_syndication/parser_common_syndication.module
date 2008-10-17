@@ -1,0 +1,660 @@
+<?php
+// $Id: parser_common_syndication.module,v 1.6.2.30 2008/04/11 19:46:33 aronnovak Exp $
+
+/**
+ * @file
+ * Parse the incoming URL with SimpleXML then provide a data structure of the feed 
+ * Require PHP5 because of SimpleXML
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function parser_common_syndication_help($section) {
+  switch ($section) {
+    case 'admin/modules#description':
+      return t('Provide a common syndication parser for FeedAPI-compatible modules. Only PHP5-compatible. Rather fast.');
+    case 'feedapi/full_name':
+      return t('Parser Common Syndication - only for PHP5');
+  }
+}
+
+/**
+ * Implementation of hook_feedapi_feed().
+ */
+function parser_common_syndication_feedapi_feed($op) {
+  $args = func_get_args();
+  switch ($op) {
+    case 'type':
+      return array("XML feed");
+    case 'compatible':
+      if (!function_exists('simplexml_load_string')) {
+        return FALSE;
+      }
+      $url = $args[1]->url;
+      $downloaded_string = _parser_common_syndication_download($url, $op);
+      if (is_object($downloaded_string)) {
+        return $downloaded_string->type;
+      }
+      if (!defined('LIBXML_VERSION') || (version_compare(phpversion(), '5.1.0', '<'))) {
+        @ $xml = simplexml_load_string($downloaded_string, NULL);
+      }
+      else {
+        @ $xml = simplexml_load_string($downloaded_string, NULL, LIBXML_NOERROR | LIBXML_NOWARNING);
+      }
+      if (_parser_common_syndication_feed_format_detect($xml) != FALSE) {
+        // The parser is compatible. Then has to parse the feed and cache it. Because in the download
+        // part, the feed etag data be already saved perhaps (depends on the webserver)
+        $parsed_feed = _parser_common_syndication_feedapi_parse($xml);
+        $cache_dir = _parser_common_syndication_sanitize_cache();
+        $cache_filename = $cache_dir .'/'. md5($url);
+        if ($cache_dir != FALSE && $parsed_feed->from_cache !== TRUE) {
+          $fp = fopen($cache_filename, 'w');
+          fwrite($fp, serialize($parsed_feed));
+          fclose($fp);
+        }
+        // We don't have to choose between the types, because this module is only able to parse one
+        return array_shift(parser_common_syndication_feedapi_feed('type'));
+      }
+      return FALSE;
+    case 'parse':
+      $feed = is_object($args[1]) ? $args[1] : FALSE;
+      $cache_dir = _parser_common_syndication_sanitize_cache();
+      $cache_filename = $cache_dir .'/'. md5($feed->url);
+      $parsed_feed = _parser_common_syndication_feedapi_parse($feed);
+      if ($cache_dir != FALSE && $parsed_feed->from_cache !== TRUE) {
+        $fp = fopen($cache_filename, 'w');
+        fwrite($fp, serialize($parsed_feed));
+        fclose($fp);
+      }
+      return $parsed_feed;
+  }
+}
+
+/**
+ * Implementaton of hook_requirements().
+ */
+function parser_common_syndication_requirements() {
+  $t = get_t();
+  if (!version_compare(5, PHP_VERSION, '<=') || !function_exists('simplexml_load_file')) {
+    return array('Parser Common Syndication' =>  array('title' => t('SimpleXML library.'), 'description' => t('A fast XML parsing library. (From PHP5)'), 'severity' => REQUIREMENT_ERROR, 'value' => $t('Missing')));
+  }
+  return array('Parser Common Syndication' =>  array('title' => t('SimpleXML library.'), 'description' => t('A fast XML parsing library. (From PHP5)'), 'severity' => REQUIREMENT_OK, 'value' => $t('Available')));
+}
+
+/**
+ * Parse the feed into a data structure
+ *
+ * @param $feed
+ *  The feed object (contains the URL or the parsed XML structure)
+ * @return stdClass
+ *  The structured datas extracted from the feed
+ */
+function _parser_common_syndication_feedapi_parse($feed) {
+  if (is_a($feed, 'SimpleXMLElement')) {
+    $xml = $feed;
+  }
+  else {
+    $downloaded_string = _parser_common_syndication_download($feed->url, 'parse');
+    if ($downloaded_string === FALSE || is_object($downloaded_string)) {
+      return $downloaded_string;
+    }
+
+    if (!defined('LIBXML_VERSION') || (version_compare(phpversion(), '5.1.0', '<'))) {
+      @ $xml = simplexml_load_string($downloaded_string, NULL);
+    }
+    else {
+      @ $xml = simplexml_load_string($downloaded_string, NULL, LIBXML_NOERROR | LIBXML_NOWARNING);
+    }
+
+    // We got a malformed XML
+    if ($xml === FALSE || $xml == NULL) {
+      return FALSE;
+    }
+  }
+  $feed_type = _parser_common_syndication_feed_format_detect($xml);
+  if ($feed_type ==  "atom1.0") {
+    return _parser_common_syndication_atom10_parse($xml);
+  }
+  if ($feed_type == "RSS2.0" || $feed_type == "RSS0.91" || $feed_type == "RSS0.92") {
+    return _parser_common_syndication_RSS20_parse($xml);
+  }
+  if ($feed_type == "RDF") {
+    return _parser_common_syndication_RDF10_parse($xml);
+  }
+  return FALSE;
+}
+
+/**
+ * Get the content from the given URL
+ *
+ * @param $url
+ *  A valid URL (not only web URLs)
+ * @param $username
+ *  If the URL use authentication, here you can supply the username for this
+ * @param $password
+ *  If the URL use authentication, here you can supply the password for this
+ * @return
+ *  The data pulled from the URL or FALSE if the feed does not need refresh
+ */
+function _parser_common_syndication_feedapi_get($url, $username = NULL, $password = NULL) {
+  $method = 'GET';
+  $follow = 3;
+  $data = NULL;
+  // Only download and parse data if really needs refresh.  Based on Last-Modified and If-Modified-Since
+  $headers = array();
+  $validate = db_fetch_array(db_query("SELECT etag, last_modified FROM {parser_common_syndication} WHERE url = '%s'", $url));
+  if (!empty($validate['etag'])) {
+    $headers['If-None-Match'] = $validate['etag'];
+  }
+  if (!empty($validate['last_modified'])) {
+    $headers['If-Modified-Since'] = $validate['last_modified'];
+  }
+  if (!empty($username)) {
+    $headers['Authorization'] = 'Basic '. base64_encode("$username:$password");
+  }
+  $result = drupal_http_request($url, $headers, $method, $data, $follow);
+  // In this case return the cached data
+  if ($result->code == 304) {
+    $cache_file = _parser_common_syndication_sanitize_cache() .'/'. md5($url);
+    if (file_exists($cache_file)) {
+      $file_content = file_get_contents($cache_file);
+      $cached_data = unserialize($file_content);
+    }
+    if (is_object($cached_data)) {
+      $cached_data->from_cache = TRUE;
+      return $cached_data;
+    }
+    else {
+      // It's a tragedy, this file has to be exist and contains good data. In this case, repeat the stuff without cache
+      db_query("DELETE FROM {parser_common_syndication} WHERE url = '%s'", $url);
+      return _parser_common_syndication_feedapi_get($url, $username, $password);
+    }
+  }
+  
+  if (db_result(db_query("SELECT COUNT(*) FROM {parser_common_syndication} WHERE url = '%s'", $url)) == 0) {
+    db_query("INSERT INTO {parser_common_syndication} (etag, last_modified, url) VALUES ('%s', '%s', '%s')", $result->headers['ETag'], $result->headers['Last-Modified'], $url);
+  }
+  else {
+    db_query("UPDATE {parser_common_syndication} SET etag = '%s', last_modified = '%s' WHERE url = '%s'", $result->headers['ETag'], $result->headers['Last-Modified'], $url);
+  }
+  
+
+  return $result->data;
+}
+
+/**
+ * Delete cache validating functions when feed is deleted
+ */
+function parser_common_syndication_nodeapi(&$node, $op) {
+  if (isset($node->feed) || feedapi_enabled($node->type)) {
+    switch ($op) {
+      case 'delete':
+        db_query("DELETE FROM {parser_common_syndication} WHERE url = '%s'", $node->feed->url);
+        $cache_dir = _parser_common_syndication_sanitize_cache();
+        $cache_filename = $cache_dir .'/'. md5($node->feed->url);
+        if (file_exists($cache_filename)) {
+          unlink($cache_filename);
+        }
+        break;
+    }
+  }
+}
+
+/**
+ * Determine the feed format of a SimpleXML parsed object structure
+ *
+ * @param $xml
+ *  SimpleXML-preprocessed feed
+ * @return
+ *  a string - means the feed format
+ */
+function _parser_common_syndication_feed_format_detect($xml) {
+  if (!is_object($xml)) {
+    return FALSE;
+  }
+  $attr = $xml->attributes();
+  //print_r($xml);
+  if (isset($xml->entry) && strtolower($xml->getName()) == "feed") {
+    return "atom1.0";
+  }
+  if (strtolower($xml->getName()) == "rss" && $attr["version"] == "2.0") {
+    return "RSS2.0";
+  }
+  if (strtolower($xml->getName()) == "rdf" && isset($xml->channel)) {
+    return "RDF";
+  }
+  if (strtolower($xml->getName()) == "rss" && $attr["version"] == "0.91") {
+    return "RSS0.91";
+  }
+  if (strtolower($xml->getName()) == "rss" && $attr["version"] == "0.92") {
+    return "RSS0.92";
+  }
+  return FALSE;
+}
+
+/**
+ * Call one of the possible feedapi_get hook and pass back the downloaded data
+ *
+ * @return
+ *  string - the downloaded data, FALSE - if the URL is not reachable
+ */
+function _parser_common_syndication_download($url, $op) {
+  // Handle password protected feeds
+  $url_parts = parse_url($url);
+  $password = $username = NULL;
+  if (!empty($url_parts['user'])) {
+    $password = $url_parts['pass'];
+    $username = $url_parts['user'];
+  }
+  
+  $downloaded_string = _parser_common_syndication_feedapi_get($url, $username, $password, $op);
+
+  // Cannot get the feed, pass the problem to one level upper
+  if ($downloaded_string == "") {
+    return FALSE;
+  }
+  // The data comes from cache, just pass one level upper
+  else if (is_object($downloaded_string)) {
+    return $downloaded_string;
+  }
+  
+  // Do the autodiscovery at this level, pass back the real data
+  // Maybe it's HTML. If it's not HTML, not worth to take a look into the downloaded string
+  if (strpos(strtolower($downloaded_string), "<html") !== FALSE) {
+    $allowed_mime = array("text/xml", "application/rss+xml", "application/atom+xml", "application/rdf+xml", "application/xml");
+    $matches = array();
+    // Get all the links tag
+    preg_match_all('/<link\s+(.*?)\s*\/?>/si', $downloaded_string, $matches);
+    $links = $matches[1];
+    $rss_link = FALSE;
+    foreach ($links as $link) {
+      $mime = array();
+      // Get the type attribute and check if the mime type is allowed
+      preg_match_all('/type\s*=\s*("|'. "'" .')([A-Za-z\/+]*)("|'. "'" .')/si', $link, $mime);
+      if (in_array(array_pop($mime[2]), $allowed_mime)) {
+        $href = array();
+        // Get the href attribute
+        preg_match_all('/href\s*=\s*("|' ."'". ')([=#\?_:.0-9A-Za-z\/+]*)("|' ."'". ')/si', $link, $href);
+        $rss_link = array_pop($href[2]);
+        if (is_string($rss_link) && strlen($rss_link) > 0 && $rss_link != $url) {
+          // Handle base url related stuff
+          $parsed_url = parse_url($rss_link);
+          if (!isset($parsed_url['host'])) {
+            // It's relative so make it absolute
+            $base_tag = array();
+            preg_match_all('/<base href\s*=\s*("|'. "'" .')([_:.0-9A-Za-z\/+]*)("|'. "'" .')/si', $link, $base_tag);
+            $base_url = array_pop($base_tag[2]);
+            if (is_string($base_url) && strlen($base_url) > 0) {
+              // Get from the HTML base tag
+              $rss_link = $base_url. $rss_link;
+            }
+            else {
+              // Guess from the original URL
+              $original_url = parse_url($url);
+              $rss_link = $original_url['scheme'] .'://'. $original_url['host']. (isset($original_url['port']) ? ':' : ''). $original_url['port']. $parsed_url['path']. '?'. $parsed_url['query']. '#'. $parsed_url['fragment'];
+            }
+          }
+          $downloaded_string = _parser_common_syndication_download($rss_link, $op);
+          break;
+        }
+      }
+    }
+  }
+  
+  // Filter out strange tags. Without this, the text would contain strange stuff.
+  // @todo: make sure that these are not important for feed element mapper
+  $downloaded_string = preg_replace(
+    array(
+      '@<script[^>]*?.*?</script>@si',
+      '@<object[^>]*?.*?</object>@si',
+      '@<embed[^>]*?.*?</embed>@si',
+      '@<applet[^>]*?.*?</applet>@si',
+      '@<noframes[^>]*?.*?</noframes>@si',
+      '@<noscript[^>]*?.*?</noscript>@si',
+      '@<noembed[^>]*?.*?</noembed>@si'
+    ),
+    array('', '', '', '', '', '', ''),
+    $downloaded_string
+  );
+  
+  return $downloaded_string;
+}
+
+/**
+ * Parse atom feeds
+ */
+function _parser_common_syndication_atom10_parse($feed_XML) {
+  $parsed_source = new stdClass();
+  // Detect the title
+  $parsed_source->title = isset($feed_XML->title) ? (string) $feed_XML->title : "";
+  // Detect the description
+  $parsed_source->description = isset($feed_XML->subtitle) ? (string) $feed_XML->subtitle : "";
+  $parsed_source->options = new stdClass();
+  // Detect the link
+  $parsed_source->options->link = "";
+  if (count($feed_XML->link) > 0) {
+    $link = $feed_XML->link;
+    $link = $link->attributes();
+    $parsed_source->options->link = (string)isset($link["href"]) ? (string) $link["href"] : "";
+  }
+
+  $parsed_source->items = array();
+
+  foreach ($feed_XML->entry as $news) {
+    $original_url = NULL;
+
+    if ($news->id) {
+      $guid = "{$news->id}";
+    }
+    else {
+      $guid = NULL;
+    }
+
+    // I don't know how standard this is, but sometimes the id is the URL
+    if (valid_url($guid, TRUE)) {
+      $original_url = $guid;
+    }
+
+    $additional_taxonomies = array();
+
+    if ($news->category) {
+      $additional_taxonomies['ATOM Categories'] = array();
+      foreach ($news->category AS $category) {
+        $additional_taxonomies['ATOM Categories'][] = (string)"{$category['term']}";
+      }
+    }
+
+    $title = "{$news->title}";
+
+    if ($news->content) {
+      $body = '';
+      foreach ($news->content->children() as $child)  {
+        $body .= $child->asXML();
+      }
+      $body .= "{$news->content}";
+    }
+    else if ($news->summary) {
+      $body = '';
+      foreach ($news->summary->children() as $child)  {
+        $body .= $child->asXML();
+      }
+      $body .= "{$news->summary}";
+    }
+
+    if ($news->content['src']) {
+      // some src elements in some valid atom feeds contained no urls at all
+      if (valid_url("{$news->content['src']}", TRUE)) {
+        $original_url = "{$news->content['src']}";
+      }
+    }
+
+    $author_found = FALSE;
+
+    if ($news->source->author->name) {
+      $original_author = "{$news->source->author->name}";
+      $author_found = TRUE;
+    }
+    else if ($news->author->name) {
+      $original_author = "{$news->author->name}";
+      $author_found = TRUE;
+    }
+
+    if ($feed_XML->author->name && !$author_found) {
+      $original_author = "{$feed_XML->author->name}";
+    }
+
+    if ($news->link['href'] && valid_url("{$news->link['href']}", TRUE)) {
+      $original_url = "{$news->link['href']}";
+    }
+
+    $timestamp = strtotime("{$news->published}");
+    if ($timestamp === FALSE) {
+      $timestamp = time();
+    }
+    $item = new stdClass();
+    $item->title = $title;
+    $item->description = $body;
+    $item->options = new stdClass();
+    $item->options->original_author = $original_author;
+    $item->options->timestamp = $timestamp;
+    $item->options->original_url = $original_url;
+    $item->options->guid = $guid;
+    $item->options->tags = $additional_taxonomies['ATOM Categories'];
+    $parsed_source->items[] = $item;
+  }
+  return $parsed_source;
+}
+
+/**
+ * Parse RSS1.0/RDF feeds
+ */
+function _parser_common_syndication_RDF10_parse($feed_XML) {
+  $parsed_source = new stdClass();
+  // Detect the title
+  $parsed_source->title = isset($feed_XML->channel->title) ? (string) $feed_XML->channel->title : "";
+  // Detect the description
+  $parsed_source->description = isset($feed_XML->channel->description) ? (string) $feed_XML->channel->description : "";
+  $parsed_source->options = new stdClass();
+  // Detect the link
+  $parsed_source->options->link = isset($feed_XML->channel->link) ? (string) $feed_XML->channel->link : "";
+  $parsed_source->items = array();
+
+  // set category splitter (space is for del.icio.us feed)
+  $category_splitter = ' ';
+
+  // get the default original author
+  if ($feed_XML->channel->title) {
+    $oa = (string) $feed_XML->channel->title;
+  }
+
+  // get all namespaces
+  if (version_compare(phpversion(), '5.1.2', '<')) {
+    //versions prior 5.1.2 don't allow namespaces
+    $namespaces['default'] = NULL;
+  }
+  else {
+    $namespaces = $feed_XML->getNamespaces(TRUE);
+  }
+
+  foreach ($feed_XML->item as $news) {
+    //initialization
+    $guid = $original_url = NULL;
+    $title = $body = '';
+    $timestamp = time();
+    $additional_taxonomies = array();
+    $original_author = $oa;
+
+    foreach ($namespaces as $ns_link) {
+      //get about attribute as guid
+      foreach ($news->attributes($ns_link) as $name => $value) {
+        if ($name == 'about') {
+          $guid = (string)$value;
+        }
+      }
+
+      //get children for current namespace
+      if (version_compare(phpversion(), '5.1.2', '<')) {
+        $ns = (array)$news;
+      }
+      else {
+        $ns = (array)$news->children($ns_link);
+      }
+
+      //title
+      if ((string)$ns['title']) {
+        $title = (string)$ns['title'];
+      }
+
+      //description or dc:description
+      if ((string)$ns['description'] && $body == '') {
+        $body = (string)$ns['description'];
+      }
+
+      //link
+      if ((string)$ns['link']) {
+        $original_url = (string)$ns['link'];
+      }
+
+      //dc:creator
+      if ((string)$ns['creator']) {
+        $original_author = (string)$ns['creator'];
+      }
+
+      //dc:date
+      if ((string)$ns['date']) {
+        $timestamp = strtotime((string)$ns['date']);
+      }
+      else if ((string)$ns['pubDate']) {
+        $timestamp = strtotime((string)$ns['pubDate']);
+      }
+
+      //content:encoded
+      if ((string)$ns['encoded']) {
+        $body = (string)$ns['encoded'];
+      }
+
+      //dc:subject
+      if ((string)$ns['subject']) {
+        //there can be multiple category tags
+        if (is_array($ns['subject'])) {
+          foreach ($ns['subject'] as $cat) {
+            if (is_object($cat)) {
+              $additional_taxonomies['RDF Categories'][] = (string) trim(strip_tags($cat->asXML()));
+            }
+            else {
+              $additional_taxonomies['RDF Categories'][] = $cat;
+            }
+          }
+        }
+        else { //or single tag
+          $additional_taxonomies['RDF Categories'] = explode($category_splitter, (string)$ns['subject']);
+        }
+      }
+    }
+
+    // description is not mandatory so use title if description not present
+    if (!$body) {
+      $body = $title;
+    }
+
+    // if there are no link tag but rdf:about is provided
+    if (!$original_url && $guid) {
+      $original_url = $guid;
+    }
+    $item = new stdClass();
+    $item->title = $title;
+    $item->description = $body;
+    $item->options = new stdClass();
+    $item->options->original_author = $original_author;
+    $item->options->timestamp = $timestamp;
+    $item->options->original_url = $original_url;
+    $item->options->guid = $guid;
+    $item->options->tags = $additional_taxonomies['RDF Categories'];
+    $parsed_source->items[] = $item;
+  }
+  return $parsed_source;
+}
+
+/**
+ * Parse RSS2.0 feeds
+ */
+function _parser_common_syndication_RSS20_parse($feed_XML) {
+  $parsed_source = new stdClass();
+  // Detect the title
+  $parsed_source->title = isset($feed_XML->channel->title) ? (string) $feed_XML->channel->title : "";
+  // Detect the description
+  $parsed_source->description = isset($feed_XML->channel->description) ? (string) $feed_XML->channel->description : "";
+  $parsed_source->options = new stdClass();
+  // Detect the link
+  $parsed_source->options->link = isset($feed_XML->channel->link) ? (string) $feed_XML->channel->link : "";
+  $parsed_source->items = array();
+
+  foreach ($feed_XML->xpath('//item') as $news) {
+    // for PHP > 5.1.2 get 'content' namespace
+    $content = (array)$news->children('content');
+
+    $news = (array)$news;
+
+    if ($news['guid']) {
+      $guid = $news['guid'];
+    }
+    else {
+      $guid = NULL;
+    }
+
+    if ((string)$news['title']) {
+      $title = (string)$news['title'];
+    }
+    else {
+      $title = '';
+    }
+
+    if ((string)$news['description']) {
+      $body = (string)$news['description'];
+    }
+    // some sources use content:encoded as description i.e. PostNuke PageSetter module
+    elseif ((string)$news['encoded']) {  //content:encoded for PHP < 5.1.2
+      $body = (string)$news['encoded'];
+    }
+    elseif ((string)$content['encoded']) { //content:encoded for PHP >= 5.1.2
+      $body = (string)$content['encoded'];
+    }
+    else {
+      $body = (string)$news['title'];
+    }
+
+    if ($feed_XML->channel->title) {
+      $original_author = (string)$feed_XML->channel->title;
+    }
+
+    if ((string)$news['link']) {
+      $original_url = (string)$news['link'];
+    }
+    else {
+      $original_url = NULL;
+    }
+
+    $timestamp = strtotime($news['pubDate']);
+    if ($timestamp === FALSE) {
+      $timestamp = time();
+    }
+
+    $additional_taxonomies = array();
+    if ((string) $news['category'] || !empty($news['category'])) {
+      if (is_array($news['category'])) {
+        $news['category'] = (string)$news['category'][0];
+      }
+      $additional_taxonomies['RSS Categories'] = (string)explode('/', $news['category']);
+    }
+
+    $item = new stdClass();
+    $item->title = $title;
+    $item->description = $body;
+    $item->options = new stdClass();
+    $item->options->original_author = $original_author;
+    $item->options->timestamp = $timestamp;
+    $item->options->original_url = $original_url;
+    $item->options->guid = $guid;
+    $item->options->tags = $additional_taxonomies['RSS Categories'];
+    $parsed_source->items[] = $item;
+  }
+  return $parsed_source;
+}
+
+/**
+ * Set the default caching directory if the current setting is not useable
+ */
+function _parser_common_syndication_sanitize_cache() {
+  $cache_location = file_directory_path() .'/parser_common_syndication_cache';
+  if (!is_writeable($cache_location) || !is_dir($cache_location)) {
+    $cache_location = file_create_path($cache_location);
+    if (!file_exists($cache_location) && is_writable(file_directory_path())) {
+      mkdir($cache_location);
+    }
+    if (!is_writeable($cache_location)) {
+      return FALSE;
+    }
+  }
+  return $cache_location;
+}

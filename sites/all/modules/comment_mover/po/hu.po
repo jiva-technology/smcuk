@@ -1,0 +1,194 @@
+# translation of comment_mover-module.po to
+# $Id: hu.po,v 1.1.2.1 2007/08/03 19:59:25 goba Exp $
+# LANGUAGE translation of Drupal (comment_mover.module)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from files:
+#  comment_mover.module,v 1.22.2.5 2007/03/26 22:44:09 heine
+#  comment_mover.info,v 1.1.2.2 2006/12/17 20:56:06 heine
+#
+# Mate Ory <orymate@gmail.com>, 2007.
+msgid ""
+msgstr ""
+"Project-Id-Version: comment_mover-module\n"
+"POT-Creation-Date: 2007-07-30 14:54+0200\n"
+"PO-Revision-Date: 2007-07-30 15:52+0200\n"
+"Last-Translator: Mate Ory <orymate@gmail.com>\n"
+"Language-Team: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms:  nplurals=2; plural=(n != 1);\n"
+"X-Generator: KBabel 1.11.4\n"
+
+#: comment_mover.module:15
+msgid "Comment mover enables you to move comments and nodes around by pruning and grafting. Pruning and grafting are similar to cut and paste but operate on branches, not on single comments. If you prune and graft a comment thread, the entire thread will be moved, not just the pruned comment."
+msgstr "A hozzászólásmozgató modul lehetővé teszi hozzászólások és tartalmak mozgatását egymás közt metszéssel és oltással. A metszés és oltás hasonló a kivágáshoz és beillesztéshez, de ágakon működik, nem egyedi hozzászólásakon. Ha kimetsz és beolt egy szálat, az egész szál áthelyeződik, nem csak a kimetszett hozzászólás."
+
+#: comment_mover.module:16
+msgid "Basic use is simple; it starts by pruning a node or comment via the link prune. The pruned node/comment now appears in the Graft block. The graft block shows the title and author of the pruned content and always allows you to cancel the action. You can now navigate through your site and choose one of two options: grafting or conversion."
+msgstr "Az alapvető használata egyszerű: kattintson a kimetszés hivatkozásra a hozzászólás vagy tartalom végénél, a kimetszett tartalom/hozzászólás megjelenik a Metszés blokkban. Ez a blokk a kimetszett tartalom címét és szerzőjét írja ki, valamint lehetőséget ad a művelet visszavonására. Az oldalon szabadon navigálhat, választhat a két lehetőség, a beoltás és az átalakítás közül."
+
+#: comment_mover.module:17
+msgid "Grafting is a simple matter: simply click the graft link on the content (comment or node) you want the pruned object to reside under. All childcomments will be moved together with the pruned node or comment"
+msgstr "A beoltás egyszerűbb: a szülőnek kívánt tartalom vagy hozzászólás beoltás hivatkozására kattintva a kimetszett szál átmozgatásra kerül."
+
+#: comment_mover.module:19
+msgid "If you just pruned a comment and enabled story and page under \"Enable promotion to the following node types\" on the <a href=\"@url\">comment mover settings page</a>, the graft block also shows you story and page in the selection of node types to which the\ncomment can be converted. When you then, for example, select story and click convert, a story submission form will appear with prefilled fields. Edit if necessary, then click submit. A new story node will be created. All children of the original comment will be moved to the new node."
+msgstr "A hozzászólás kimetszését követően a metszés blokkon meg fognak jelenni a <a href=\"@url\">hozzászólásmozgató beállításai oldalon</a>, az „A következő tartalomtípusokká való előléptetés engedélyezése” pontnál kiválasztott tartalomtípusok. Ha például az „írás” lehetőségre kattint, egy előre kitöltött írásbeküldő űrlap fog megjelenni. Szükség esetén szerkesztheti, majd kattintson a Beküldés gombra. Egy új írás jön létre az eredeti hozzászólásra érkezett válaszokkal."
+
+#: comment_mover.module:21
+msgid "When you move a comment to another node or convert it to a node, the original comment will contain a link pointing to the comments new location. When you move a node to become a comment on another node, the original node will contain a redirect to the new location."
+msgstr "Hogyha egy hozzászólást más tartalomba mozgatja vagy alakítja át, az eredeti helyen egy az új helyre mutató hivatkozás készül. Ha egy tartalmat mozgat át egy másik hozzászólásai közé, az eredeti webcím az új helyre fogja irányítani a látogatókat."
+
+#: comment_mover.module:34
+msgid "cancel pruning"
+msgstr "kimetszés visszavonása"
+
+#: comment_mover.module:39 comment_mover.info:0
+msgid "Comment mover"
+msgstr "Hozzászólásmozgató"
+
+#: comment_mover.module:40
+msgid "Configure comment mover to operate on specific content types."
+msgstr "A hozzászólásmozgató beállítása adott tartalomtípusokon való működésre."
+
+#: comment_mover.module:47
+msgid "Promote comment"
+msgstr "Hozzászólás tartalommá alakítása"
+
+#: comment_mover.module:51;56
+msgid "Prune comment"
+msgstr "Hozzászólás kimetszése"
+
+#: comment_mover.module:81
+msgid "graft"
+msgstr "beoltás"
+
+#: comment_mover.module:89
+msgid "prune"
+msgstr "kimetszés"
+
+#: comment_mover.module:103;704
+msgid "Graft"
+msgstr "Beoltás"
+
+#: comment_mover.module:111
+msgid "Prune"
+msgstr "Kimetszés"
+
+#: comment_mover.module:138
+msgid "Convert to"
+msgstr "Átalakítás…"
+
+#: comment_mover.module:142
+msgid "Convert"
+msgstr "Átalakítás"
+
+#: comment_mover.module:189
+msgid "Author has been set to %username."
+msgstr "Az új szerzö %username."
+
+#: comment_mover.module:194
+msgid "Submit %name"
+msgstr "%name beküldése"
+
+#: comment_mover.module:258
+msgid "Comment: updated %subject."
+msgstr "Hozzászólás: %subject frissítve."
+
+#: comment_mover.module:258;267;302
+msgid "view"
+msgstr ""
+
+#: comment_mover.module:267
+msgid "Comment: moved %subject."
+msgstr "Hozzászólás: %subject elmozgatva."
+
+#: comment_mover.module:302
+msgid "Comment: added %subject."
+msgstr "Hozzászólás: %subject hozzáadva."
+
+#: comment_mover.module:374;408
+msgid "This comment has been moved <a href=\"@url\">here</a>."
+msgstr "<a href=\"@url\">Ez a hozzászólás</a> áthelyezésre került."
+
+#: comment_mover.module:390
+msgid "comment cannot be grafted on one of its children"
+msgstr "Hozzászólás beoltása saját gyermekébe nem lehetséges"
+
+#: comment_mover.module:542;553
+msgid "Pruning %title."
+msgstr "%title kimetszése"
+
+#: comment_mover.module:558
+msgid "Unable to prune the post."
+msgstr "Ezen tartalom kimetszése nem lehetséges."
+
+#: comment_mover.module:570
+msgid "Are you sure you want to move this post here?"
+msgstr "Biztosan ide mozgatja át ezt a tartalmat?"
+
+#: comment_mover.module:601;619;638
+msgid "Grafted %title."
+msgstr "%title beoltva."
+
+#: comment_mover.module:644
+msgid "Unable to move the post."
+msgstr "Ezen tartalom mozgatása nem lehetséges."
+
+#: comment_mover.module:699
+msgid "Comment mover clipboard"
+msgstr "Hozzászólásmozgató vágólap"
+
+#: comment_mover.module:737;744
+msgid "By !author @date"
+msgstr "!author, @date"
+
+#: comment_mover.module:738;745
+msgid "cancel"
+msgstr "mégsem"
+
+#: comment_mover.module:803
+msgid "Enable pruning of the following node types"
+msgstr "A következő tartalomtípusok kimetszésének engedélyezése"
+
+#: comment_mover.module:807
+msgid "Define the node types that can be pruned. Note that pruning doesn't make sense for certain node types (poll, for example)."
+msgstr "Válassza ki a kimetszhető tartalomtípusokat. Fontos, hogy bizonyos tartalomtípusok (például a szavazás) esetén ez értelmetlen lehet."
+
+#: comment_mover.module:812
+msgid "Enable pruning of comments on the following node types"
+msgstr "A következő tartalomtípusokra érkezett hozzászólások kimetszésének engedélyezése"
+
+#: comment_mover.module:816
+msgid "Allow comments on these node types to be pruned and moved to other nodes or be promoted to a node."
+msgstr "Lehetővé teszi ezen tartalomtípusok hozzászólásainak kimetszését, áthelyezését és tartalommá alakítását."
+
+#: comment_mover.module:821
+msgid "Enable grafting on the following node types"
+msgstr "A következő tartalomtípusokba való oltás engedélyezése"
+
+#: comment_mover.module:825
+msgid "These node types allow grafting of pruned nodes and comments."
+msgstr "Ezen tartalomtípusokhoz tartozó tartalmakba lehetséges hozzászólások vagy tartalmak beoltása."
+
+#: comment_mover.module:830
+msgid "Enable promotion to the following node types"
+msgstr "A következő tartalomtípusokká való előléptetés engedélyezése"
+
+#: comment_mover.module:834
+msgid "Comments can be promoted to these nodetypes. Note that this doesn't make sense for certain node types (poll, for example)."
+msgstr "Hozzászólásokat ezen tartalomtípusokká léptethet elő. Fontos, hogy bizonyos tartalomtípusok (például a szavazás) esetén ez értelmetlen lehet."
+
+#: comment_mover.module:258;267;302
+msgid "content"
+msgstr "tartalom"
+
+#: comment_mover.module:0 comment_mover.info:0
+msgid "comment_mover"
+msgstr "tartalommozgato"
+
+#: comment_mover.info:0
+msgid "Move comments to other threads or convert them to nodes."
+msgstr "Hozzászólások mozgatása más szálakba vagy új tartalmakba."
+

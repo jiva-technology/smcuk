@@ -1,0 +1,4 @@
+; $Id: nodereview.info,v 1.1.2.2 2007/06/18 23:06:54 dww Exp $
+name = Node Review
+description = "Add reviews to arbitrary node types."
+dependencies = views votingapi

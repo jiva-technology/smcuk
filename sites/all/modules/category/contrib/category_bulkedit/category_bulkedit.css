@@ -1,0 +1,10 @@
+/* $Id: category_bulkedit.css,v 1.1 2006/05/18 15:22:14 jaza Exp $ */
+
+.category-bulkedit-floated-list {
+  float: left;
+  width: 25%;
+  margin-top: 0;
+}
+.category-bulkedit-clear {
+  clear: both;
+}

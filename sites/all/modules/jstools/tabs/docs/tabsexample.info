@@ -1,0 +1,4 @@
+; $Id: tabsexample.info,v 1.2 2007/06/18 22:53:47 dww Exp $
+name = Tabs Example
+description = An example tabs implementation. Access the sample tabs at /tabsexample.
+package = Javascript tools

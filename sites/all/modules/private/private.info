@@ -1,0 +1,3 @@
+; $Id: private.info,v 1.1.2.1 2007/01/10 04:31:57 eaton Exp $
+name = Private
+description = Allows users to mark content as private, and hide that content from visitors.

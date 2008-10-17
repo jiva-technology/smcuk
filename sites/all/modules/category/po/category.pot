@@ -1,0 +1,437 @@
+# LANGUAGE translation of Drupal (category.module)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from file: category.module,v 1.77 2006/03/14 07:49:47 jaza
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"POT-Creation-Date: 2006-03-14 02:08-0600\n"
+"PO-Revision-Date: YYYY-mm-DD HH:MM+ZZZZ\n"
+"Last-Translator: NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <EMAIL@ADDRESS>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: category.module:15
+msgid "Allows you to structure your site and categorize content."
+msgstr ""
+
+#: category.module:17;19
+msgid "<p>The category module allows you to structure your site and to categorize content: you can create multiple containers (types of categorizations) that contain a tree of categories; you can assign content to your categories; and you can give your categories their own content (such as a description).</p>"
+msgstr ""
+
+#: category.module:21
+msgid "Categories are used to structure your site, and to categorize content. You can create a category as the child of a container, or of another category. You can assign content to one or more categories."
+msgstr ""
+
+#: category.module:23
+msgid "A container is usually the root of a category tree, but can also be created as the child of another container, or of a category. Containers are used for describing a particular way of classifying content."
+msgstr ""
+
+#: category.module:25
+msgid "<p>Categories in a site are like a tree. As they are edited, reorganized and removed, children might be left with no link to the rest of the structure.  Such categories are referred to as \"orphans\".  On this page, administrators can review their site for orphans and reattach those categories as desired.</p>"
+msgstr ""
+
+#: category.module:27
+msgid "<p>Settings controlling the behaviour of categories and containers on this site. As well as settings for the category module itself, settings for other modules in the category package can also be configured here. Only global settings are controlled here: most settings are controlled on a per-container or per-category basis, and are instead configured on the add/edit category/container pages. See the <a href=\"%category\">categories</a> page for actual categories and containers.</p>"
+msgstr ""
+
+#: category.module:35;121;216
+msgid "container"
+msgstr ""
+
+#: category.module:35;116;204;1439;0
+msgid "category"
+msgstr ""
+
+#: category.module:62;74;159
+msgid "categories"
+msgstr ""
+
+#: category.module:80;152
+msgid "list"
+msgstr ""
+
+#: category.module:86
+msgid "containers"
+msgstr ""
+
+#: category.module:92;166
+msgid "outline"
+msgstr ""
+
+#: category.module:100;175
+msgid "orphans"
+msgstr ""
+
+#: category.module:108
+msgid "add container"
+msgstr ""
+
+#: category.module:125
+msgid "autocomplete category"
+msgstr ""
+
+#: category.module:131
+msgid "activeselect category"
+msgstr ""
+
+#: category.module:184
+msgid "add category"
+msgstr ""
+
+#: category.module:229
+msgid "feed"
+msgstr ""
+
+#: category.module:290
+msgid "add child category"
+msgstr ""
+
+#: category.module:293
+msgid "add child container"
+msgstr ""
+
+#: category.module:319
+msgid "None"
+msgstr ""
+
+#: category.module:320
+msgid "One"
+msgstr ""
+
+#: category.module:321;706;916
+msgid "Multiple"
+msgstr ""
+
+#: category.module:327
+msgid "Distant parent settings"
+msgstr ""
+
+#: category.module:333
+msgid "Number of parents that a container can have"
+msgstr ""
+
+#: category.module:336
+msgid "If set to more than zero, this allows your containers to select other containers, or categories, as distant parents. Changing this setting does not affect your existing containers; unless you change it from 'one' or 'multiple' to 'zero', and you then manually update an individual container, in which case all distant parent relationships for that container will be lost. This setting does not affect distant parent relationships for categories: these are managed separately within each container."
+msgstr ""
+
+#: category.module:607
+msgid "Body"
+msgstr ""
+
+#: category.module:636
+msgid "Category information"
+msgstr ""
+
+#: category.module:636;901
+msgid "Container information"
+msgstr ""
+
+#: category.module:642
+msgid "Description"
+msgstr ""
+
+#: category.module:645
+msgid "A description of the category. Generally seen by users as title text, when hovering over a link to the category."
+msgstr ""
+
+#: category.module:645
+msgid "A description of the container; can be used by modules."
+msgstr ""
+
+#: category.module:674
+msgid "Container"
+msgstr ""
+
+#: category.module:677
+msgid "The container that this category belongs in."
+msgstr ""
+
+#: category.module:689
+msgid "Help text"
+msgstr ""
+
+#: category.module:693
+msgid "Instructions to present to the user when choosing a category."
+msgstr ""
+
+#: category.module:697;909;1235;1239
+msgid "Types"
+msgstr ""
+
+#: category.module:700;911
+msgid "A list of node types you want to associate with categories in this container."
+msgstr ""
+
+#: category.module:704;915
+msgid "Hierarchy"
+msgstr ""
+
+#: category.module:706;916
+msgid "Single"
+msgstr ""
+
+#: category.module:707;917
+msgid "Allows <a href=\"%help-url\">a tree-like hierarchy</a> between categories within a container. Depending on your distant parent configuration, this may also allow a hierarchy between categories and containers regardless of their parent container. Be aware that the <em>multiple</em> option refers to multiple parents, as opposed to multiple levels of hierarchy."
+msgstr ""
+
+#: category.module:712;922
+msgid "Related terms"
+msgstr ""
+
+#: category.module:714;923
+msgid "Allows <a href=\"%help-url\">relations</a> between arbitrary categories or containers."
+msgstr ""
+
+#: category.module:718;819;929
+msgid "Synonyms"
+msgstr ""
+
+#: category.module:720;930
+msgid "Allows <a href=\"%help-url\">synonyms</a> for a category or container, such as misspellings and acronyms."
+msgstr ""
+
+#: category.module:724;936
+msgid "Free tagging"
+msgstr ""
+
+#: category.module:726;937
+msgid "Content is categorized by typing terms instead of choosing from a list."
+msgstr ""
+
+#: category.module:730;941
+msgid "Multiple select"
+msgstr ""
+
+#: category.module:732;942
+msgid "Allows nodes to have more than one category from a particular container (always true for free tagging)."
+msgstr ""
+
+#: category.module:736;946
+msgid "Required"
+msgstr ""
+
+#: category.module:738;947
+msgid "If enabled, every node <strong>must</strong> have at least one category from within this container."
+msgstr ""
+
+#: category.module:742;953
+msgid "Hidden container"
+msgstr ""
+
+#: category.module:745
+msgid "Sets this container's 'hidden' attribute. This attribute is not used by the core category module, but can affect how this container is treated by other modules. For example, hidden containers do not have menu items generated by category_menu, and are not shown in navigational elements by category_display. This hidden behaviour applies only to the container itself, not to its child categories or to their assigned nodes."
+msgstr ""
+
+#: category.module:750;844;959;985;1855
+msgid "root"
+msgstr ""
+
+#: category.module:777;965;1235
+msgid "Parents"
+msgstr ""
+
+#: category.module:777
+msgid "Parent categories or containers. Containers are marked with an asterisk (*)."
+msgstr ""
+
+#: category.module:780;796;962
+msgid "Parent"
+msgstr ""
+
+#: category.module:780;796
+msgid "Parent category or container. Containers are marked with an asterisk (*)."
+msgstr ""
+
+#: category.module:802;2028
+msgid "Weight"
+msgstr ""
+
+#: category.module:805
+msgid "Pages at a given level are ordered first by weight and then by title."
+msgstr ""
+
+#: category.module:809
+msgid "Depth"
+msgstr ""
+
+#: category.module:812
+msgid "The depth of child categories that a node listing reflects. Set this to a negative value to reflect an infinite depth. Although a container cannot be assigned nodes, it can still list nodes of child categories, if it has a depth that is not 0."
+msgstr ""
+
+#: category.module:823
+msgid "Synonyms of this category or container, one synonym per line."
+msgstr ""
+
+#: category.module:828
+msgid "Related categories"
+msgstr ""
+
+#: category.module:828
+msgid "Other categories in this container that are related to this one."
+msgstr ""
+
+#: category.module:843
+msgid "this container"
+msgstr ""
+
+#: category.module:858;995;1285
+msgid "Distant parents"
+msgstr ""
+
+#: category.module:864;1001
+msgid "Allowed Parents"
+msgstr ""
+
+#: category.module:869
+msgid "Specifies the containers from which categories in this container can have parents. If you select containers other than this one, then categories in this container can have distant parents. It is recommended for security reasons that you only select this container (which is the default), unless you are certain that all users adding categories to this container are both experienced and trustworthy."
+msgstr ""
+
+#: category.module:955
+msgid "Sets the 'hidden' attribute of the selected containers. This attribute is not used by the core category module, but can affect how these containers are treated by other modules. For example, hidden containers do not have menu items generated by category_menu, and are not shown in navigational elements by category_display. This hidden behaviour applies only to the containers themselves, not to their child categories or to their assigned nodes."
+msgstr ""
+
+#: category.module:970
+msgid "Depth of containers"
+msgstr ""
+
+#: category.module:973
+msgid "The depth of child categories that a node listing reflects. Set this to a negative value to reflect an infinite depth. Although a container cannot be assigned nodes, it can still list nodes of child categories, if it has a depth that is not 0.<br/><em>Note:</em> this setting only affects containers, not their child categories."
+msgstr ""
+
+#: category.module:977
+msgid "Depth of categories"
+msgstr ""
+
+#: category.module:980
+msgid "Same as previous setting, except that this setting only affects categories, not containers."
+msgstr ""
+
+#: category.module:984
+msgid "parent container"
+msgstr ""
+
+#: category.module:1006
+msgid "Specifies the containers from which categories in these containers can have parents. If you select containers other than the parent one, then categories in these containers can have distant parents. It is recommended for security reasons that you only select the parent container (which is the default), unless you are certain that all users adding categories to these containers are both experienced and trustworthy."
+msgstr ""
+
+#: category.module:1185
+msgid "The post has been added to the category structure."
+msgstr ""
+
+#: category.module:1189
+msgid "The category outline has been updated."
+msgstr ""
+
+#: category.module:1193
+msgid "The post has been removed from the category structure."
+msgstr ""
+
+#: category.module:1235;1239;1285;1289
+msgid "Name"
+msgstr ""
+
+#: category.module:1235;1239;1285;1289;2028
+msgid "Operations"
+msgstr ""
+
+#: category.module:1267;1270
+msgid "edit container"
+msgstr ""
+
+#: category.module:1267;1270
+msgid "list categories"
+msgstr ""
+
+#: category.module:1275
+msgid "No containers available."
+msgstr ""
+
+#: category.module:1321;1324;2038
+msgid "edit"
+msgstr ""
+
+#: category.module:1330
+msgid "No categories available."
+msgstr ""
+
+#: category.module:1370;1420
+msgid "Save categories and containers"
+msgstr ""
+
+#: category.module:1376
+msgid "There are no containers or categories."
+msgstr ""
+
+#: category.module:1426
+msgid "There are no orphan categories or containers."
+msgstr ""
+
+#: category.module:1439
+msgid "%type: updated %title."
+msgstr ""
+
+#: category.module:1439;2037
+msgid "view"
+msgstr ""
+
+#: category.module:1445
+msgid "Updated categories and containers."
+msgstr ""
+
+#: category.module:1449
+msgid "Updated orphan categories."
+msgstr ""
+
+#: category.module:1472
+msgid "Submit"
+msgstr ""
+
+#: category.module:1572
+msgid "Categories"
+msgstr ""
+
+#: category.module:1600
+msgid "A comma-separated list of terms describing this content.  Example: funny, bungie jumping, \"Company, Inc.\"."
+msgstr ""
+
+#: category.module:1666
+msgid "The %name container can not be modified in this way."
+msgstr ""
+
+#: category.module:2039
+msgid "delete"
+msgstr ""
+
+#: category.module:1439
+msgid "content"
+msgstr ""
+
+#: category.module:42
+msgid "create categories"
+msgstr ""
+
+#: category.module:42
+msgid "create containers"
+msgstr ""
+
+#: category.module:42
+msgid "edit all categories"
+msgstr ""
+
+#: category.module:42
+msgid "edit own categories"
+msgstr ""
+
+#: category.module:42
+msgid "transform posts into categories"
+msgstr ""
+
+#: category.module:42
+msgid "administer categories"
+msgstr ""
+

@@ -1,0 +1,49 @@
+<?php
+// $Id: category_transform.install,v 1.1 2007/01/05 15:31:16 jaza Exp $
+
+/**
+ * @file
+ * Update file for the category_transform module. All functions in this
+ * file are implementations of hook_update_N(), unless indicated otherwise.
+ */
+
+/**
+ * Drupal 5.0 updates
+ */
+function category_transform_update_1() {
+  $ret = array();
+
+  // Update the keys and values of the 'category_transform_node_types_cat' variable.
+  $nodetypes = variable_get('category_transform_node_types_cat', array());
+  foreach ($nodetypes as $nodetype => $val) {
+    if (strpos($nodetype, '-') !== FALSE) {
+      $new_nodetype = str_replace('-', '_', $nodetype);
+      if ($nodetype === $val) {
+        $nodetypes[$new_nodetype] = $new_nodetype;
+      }
+      else {
+        $nodetypes[$new_nodetype] = $val;
+      }
+      unset($nodetypes[$nodetype]);
+    }
+  }
+  variable_set('category_transform_node_types_cat', $nodetypes);
+
+  // Update the keys and values of the 'category_transform_node_types_cont' variable.
+  $nodetypes = variable_get('category_transform_node_types_cont', array());
+  foreach ($nodetypes as $nodetype => $val) {
+    if (strpos($nodetype, '-') !== FALSE) {
+      $new_nodetype = str_replace('-', '_', $nodetype);
+      if ($nodetype === $val) {
+        $nodetypes[$new_nodetype] = $new_nodetype;
+      }
+      else {
+        $nodetypes[$new_nodetype] = $val;
+      }
+      unset($nodetypes[$nodetype]);
+    }
+  }
+  variable_set('category_transform_node_types_cont', $nodetypes);
+
+  return $ret;
+}

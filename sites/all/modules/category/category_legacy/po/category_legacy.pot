@@ -1,0 +1,189 @@
+# LANGUAGE translation of Drupal (category_legacy.module)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from file: category_legacy.module,v 1.16 2006/03/14 07:49:47 jaza
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"POT-Creation-Date: 2006-03-14 02:22-0600\n"
+"PO-Revision-Date: YYYY-mm-DD HH:MM+ZZZZ\n"
+"Last-Translator: NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <EMAIL@ADDRESS>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: category_legacy.module:16
+msgid "Allows you to convert your taxonomy and book data into category data, and vice versa. Requires the category module."
+msgstr ""
+
+#: category_legacy.module:18
+msgid "<p>The category legacy module lets you import vocabularies and terms from the taxonomy module, and books from the book module. These are then converted into containers and categories. You can also export containers and categories back to the taxonomy and book modules. It is strongly recommended that you back up all existing taxonomy and book data on your site, before performing any operations using this module.</p><p>This module requires the category module.</p>"
+msgstr ""
+
+#: category_legacy.module:20
+msgid "Select the vocabularies that you wish to import. Only vocabularies that do not already have equivalent containers are listed. A vocabulary is defined as legacy (and therefore appears on this list) only if no container can be found with the same ID, and with the same title."
+msgstr ""
+
+#: category_legacy.module:21
+msgid "For each vocabulary that you select, the vocabulary and all its terms will be imported into the category system. Vocabularies will become containers, and terms will become categories. Vocabularies and terms have their own vocabulary and term IDs, whereas categories and containers use the more standard node IDs; therefore, in order to avoid any possible conflict in sequencing, everything that you import will be given a new node ID, and will lose its old vocabulary or term ID."
+msgstr ""
+
+#: category_legacy.module:22
+msgid "<strong>Warning:</strong> all vocabularies and terms that you import will be deleted from the taxonomy database tables! If you have the taxonomy wrapper installed, then they will all be re-inserted, and will be untouched except for having new IDs, to match your newly imported categories and containers. If you have any doubts, you should enable the 'backup all selected data' option before proceeding."
+msgstr ""
+
+#: category_legacy.module:25
+msgid "Select the books that you wish to import. Only books that do not already have equivalent containers are listed. A book is defined as legacy (and therefore appears on this list) only if no container can be found with the same ID, and with the same title."
+msgstr ""
+
+#: category_legacy.module:26
+msgid "For each book that you select, the book and all its children will be imported into the category system. Root book pages will become containers, and all child pages will become categories. The node IDs for each book page will be preserved during the import, and will remain unchanged once the book pages are transformed into categories and containers."
+msgstr ""
+
+#: category_legacy.module:40
+msgid "legacy import"
+msgstr ""
+
+#: category_legacy.module:46
+msgid "taxonomy"
+msgstr ""
+
+#: category_legacy.module:52
+msgid "book"
+msgstr ""
+
+#: category_legacy.module:62
+msgid "taxonomy term"
+msgstr ""
+
+#: category_legacy.module:133
+msgid "Redirected existing legacy paths."
+msgstr ""
+
+#: category_legacy.module:160
+msgid "Changed existing legacy path aliases."
+msgstr ""
+
+#: category_legacy.module:197
+msgid "Enabled"
+msgstr ""
+
+#: category_legacy.module:198
+msgid "Disabled"
+msgstr ""
+
+#: category_legacy.module:202
+msgid "General settings"
+msgstr ""
+
+#: category_legacy.module:208
+msgid "Description field"
+msgstr ""
+
+#: category_legacy.module:209
+msgid "Body field"
+msgstr ""
+
+#: category_legacy.module:213
+msgid "Import descriptions into"
+msgstr ""
+
+#: category_legacy.module:215
+msgid "Determines the field into which description text from vocabularies and terms will be imported. Because taxonomy terms cannot have body text (like nodes do), many users resort to treating the description field as a body field. If the description text in many of your terms is longer than one sentence, it is recommended that you import it as body text."
+msgstr ""
+
+#: category_legacy.module:230
+msgid "Redirect existing legacy paths"
+msgstr ""
+
+#: category_legacy.module:232
+msgid "Redirects all paths to taxonomy terms (such as %taxonomy-path, %taxonomy-rss, and %taxonomy-query) to their category equivalents (such as %category-path, %category-rss, and %category-query). The redirection only works if the taxonomy module is disabled, or is replaced with the taxonomy wrapper."
+msgstr ""
+
+#: category_legacy.module:237
+msgid "Change existing legacy path aliases"
+msgstr ""
+
+#: category_legacy.module:239
+msgid "Searches for any existing aliases to taxonomy terms in the selected vocabularies (where aliases are in the form %taxonomy-path), and changes them to point to the new corresponding categories, in the form %category-path. Also changes aliases to taxonomy RSS feeds (where aliases are in the form %taxonomy-rss) to point to category RSS feeds, in the form %category-rss."
+msgstr ""
+
+#: category_legacy.module:245
+msgid "Backup all selected data"
+msgstr ""
+
+#: category_legacy.module:247
+msgid "Creates a backup copy of all selected vocabularies and their terms, before deleting them from the taxonomy database tables. These backups can be managed, and can be restored to their original state at any time."
+msgstr ""
+
+#: category_legacy.module:268
+msgid "Import"
+msgstr ""
+
+#: category_legacy.module:298
+msgid "No legacy vocabularies available."
+msgstr ""
+
+#: category_legacy.module:337
+msgid "No legacy books available."
+msgstr ""
+
+#: category_legacy.module:366
+msgid "You must select at least one vocabulary."
+msgstr ""
+
+#: category_legacy.module:383
+msgid "You must select at least one book."
+msgstr ""
+
+#: category_legacy.module:412
+msgid "Backed up selected data."
+msgstr ""
+
+#: category_legacy.module:414
+msgid "Deleted data from taxonomy tables."
+msgstr ""
+
+#: category_legacy.module:441;486
+msgid "Inserted new category data."
+msgstr ""
+
+#: category_legacy.module:444;489
+msgid "Legacy data re-generated by taxonomy wrapper."
+msgstr ""
+
+#: category_legacy.module:447;492
+msgid "Legacy data re-generated by book wrapper."
+msgstr ""
+
+#: category_legacy.module:525;577
+msgid "Selected"
+msgstr ""
+
+#: category_legacy.module:526;578
+msgid "Title"
+msgstr ""
+
+#: category_legacy.module:527
+msgid "VID"
+msgstr ""
+
+#: category_legacy.module:528
+msgid "No. of terms"
+msgstr ""
+
+#: category_legacy.module:579
+msgid "NID"
+msgstr ""
+
+#: category_legacy.module:580
+msgid "Direct children"
+msgstr ""
+
+#: category_legacy.module:0
+msgid "category_legacy"
+msgstr ""
+

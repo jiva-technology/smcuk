@@ -1,0 +1,5 @@
+; $Id: subscriptions_ui.info,v 1.1.2.2 2008/01/18 21:47:25 chx Exp $
+name = Subscriptions UI
+description = Provides a UI to Subscriptions.
+package = "Subscriptions"
+dependencies = subscriptions

@@ -1,0 +1,57 @@
+# LANGUAGE translation of Drupal (category_export.module)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from file: category_export.module,v 1.5 2006/03/11 07:19:08 jaza
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"POT-Creation-Date: 2006-03-14 02:26-0600\n"
+"PO-Revision-Date: YYYY-mm-DD HH:MM+ZZZZ\n"
+"Last-Translator: NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <EMAIL@ADDRESS>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+
+#: category_export.module:15
+msgid "Allows category trees to be exported as printer-friendly HTML. Requires the category module."
+msgstr ""
+
+#: category_export.module:17
+msgid "<p>The category export module allows category trees to be exported as printer-friendly HTML. Users with the 'view printer-friendly categories' permission will see a 'view printer-friendly version' link on category pages, which they can click to access the printer-friendly HTML. This module requires the category module.</p>"
+msgstr ""
+
+#: category_export.module:73;104
+msgid "Category export settings"
+msgstr ""
+
+#: category_export.module:79;110
+msgid "Allowed export types"
+msgstr ""
+
+#: category_export.module:82;112
+msgid "You may allow this container and all categories within it to be exported in a variety of formats. The number of export options available depends on what export modules you have installed. Users will only be able to perform the exports that they have access to (as defined on the access control page). Additionally, if this container or any categories within it has distant children, then those children will be included in an export, if the relevant export is enabled for that container as well."
+msgstr ""
+
+#: category_export.module:82;112
+msgid "<strong>Note:</strong> if you are using export modules that were written for the book module, then these modules will work with the category module (through the book wrapper), but will not be configurable on a per-container basis. So book-export modules, such as export_dxml and export_opml, will not be listed here."
+msgstr ""
+
+#: category_export.module:134
+msgid "Printer-friendly HTML"
+msgstr ""
+
+#: category_export.module:201
+msgid "printer-friendly version"
+msgstr ""
+
+#: category_export.module:203
+msgid "Show a printer-friendly version of this category and its sub-pages."
+msgstr ""
+
+#: category_export.module:0
+msgid "category_export"
+msgstr ""
+

@@ -1,0 +1,16 @@
+Seesmic is a video conversation platform. Seesmic API module provides a Drupal wrapper for Seesmic API (see more about on their wiki).
+
+Seesmic API module exports 2 functions :
+
+seesmic_api_show_recorder ( $reply_to_id = '' ) this function will printout inside a div seesmic recorder.
+seesmic_api_show_player ( $dsvid ) where dsvid is the internal video identifier (Drupal Seesmic Video IDentifier).
+
+When a video has been recorded, it will be stored inside a table and a hook will be called. To implement this hook, simply create, inside your module a function ending by _seesmic_api.
+
+The module cannot be used as it, mainly designed to provide an entry point for other modules inside Seesmic universe.
+
+We're currently releasing a Seeslmic comments module.
+
+Powered by ADYAX.
+
+PS : We LOVE Drupal !

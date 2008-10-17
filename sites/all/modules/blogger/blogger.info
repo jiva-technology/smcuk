@@ -1,0 +1,7 @@
+; $Id: blogger.info,v 1.3 2007/06/05 11:55:33 Wendy Exp $
+name = Blogger
+description = The Blogger module displays a list of bloggers.
+package = Merdeka
+version = "5.x-1.4"
+project = "blogger"
+datestamp = "1195369503"

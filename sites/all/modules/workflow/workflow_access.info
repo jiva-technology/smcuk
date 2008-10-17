@@ -1,0 +1,5 @@
+; $Id: workflow_access.info,v 1.1.2.1 2007/04/26 16:02:17 mfredrickson Exp $
+name = Workflow access
+description = Content access control based on workflows and roles
+dependencies = workflow
+package = Workflow

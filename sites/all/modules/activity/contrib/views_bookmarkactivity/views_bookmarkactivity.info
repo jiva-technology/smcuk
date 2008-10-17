@@ -1,0 +1,5 @@
+; $Id: views_bookmarkactivity.info,v 1.1.2.3 2008/02/19 14:20:51 sirkitree Exp $
+name = Views bookmark activity
+description = Enable activity notifications for views bookmarks.
+dependencies = activity views_bookmark
+package = Activity

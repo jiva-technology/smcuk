@@ -1,0 +1,17 @@
+#blogger {
+  padding:0;	
+}
+
+#blogger img {
+  float: right;
+}
+#blogger table{
+  width:100%;	
+}
+#blogger tr.odd {
+  background: #DADCE0;
+}
+
+#blogger tr.even {
+  background: #eeeeee;
+}

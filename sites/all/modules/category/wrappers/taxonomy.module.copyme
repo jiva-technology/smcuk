@@ -1,0 +1,1133 @@
+<?php
+// $Id: taxonomy.module.copyme,v 1.26.2.2 2007/02/02 08:24:56 jaza Exp $
+
+/**
+ * @file
+ * Wrapper module to provide a compatibility layer between the taxonomy
+ * module and the category module.
+ */
+
+/**
+ * Implementation of hook_link().
+ *
+ * This hook is extended with $type = 'taxonomy terms' to allow themes to
+ * print lists of terms associated with a node. Themes can print taxonomy
+ * links with:
+ *
+ * if (module_exists('taxonomy')) {
+ *   $this->links(taxonomy_link('taxonomy terms', $node));
+ * }
+ */
+function taxonomy_link($type, $node = NULL) {
+  if (!isset($node) || $type == 'node') {
+    return array();
+  }
+
+  if ($type == 'taxonomy terms') {
+    $type = 'categories';
+    if (isset($node->taxonomy) && is_array($node->taxonomy)) {
+      foreach ($node->taxonomy as $key => $term) {
+        $term_defined = FALSE;
+        if (isset($node->category[$term->tid])) {
+          $term_defined = TRUE;
+        }
+
+        if (!$term_defined) {
+          $cat = category_get_category($term->tid);
+          $node->category[$cid] = $cat;
+        }
+      }
+    }
+  }
+
+  $links = category_link($type, $node);
+
+  // We call this hook again because some modules and themes call taxonomy_link('taxonomy terms') directly
+  foreach (module_implements('link_alter') as $module) {
+    $function = $module .'_link_alter';
+    $function($node, $links);
+  }
+
+  return $links;
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function taxonomy_menu($may_cache) {
+  $items = array();
+
+  if ($may_cache) {
+    if (!module_exists('category_legacy')) {
+      $items[] = array('path' => 'taxonomy/term', 'title' => t('taxonomy term'),
+        'callback' => 'taxonomy_term_page',
+        'access' => user_access('access content'),
+        'type' => MENU_CALLBACK);
+    }
+  }
+
+  return $items;
+}
+
+/**
+ * Menu callback; redirects the user to a taxonomy term's new category page.
+ */
+function taxonomy_term_page($str_tids = '', $depth = 0, $op = 'page') {
+  $operator = NULL;
+  $tids = array();
+
+  if (preg_match('/^([0-9]+[+ ])+[0-9]+$/', $str_tids)) {
+    $operator = '+';
+    // The '+' character in a query string may be parsed as ' '.
+    $tids = preg_split('/[+ ]/', $str_tids);
+  }
+  elseif (preg_match('/^([0-9]+,)+[0-9]+$/', $str_tids)) {
+    $operator = ',';
+    $tids = explode($operator, $str_tids);
+  }
+  elseif (preg_match('/^[0-9]+$/', $str_tids)) {
+    $tids = array($str_tids);
+  }
+
+  if (!empty($tids)) {
+    $map = array();
+
+    $tids_query = implode(', ', array_fill(0, count($tids), '%d'));
+
+    $sql = db_query('SELECT tid FROM {term_data} t INNER JOIN {category} c ON t.tid = c.cid INNER JOIN {node} n ON t.tid = n.nid AND t.name = n.title WHERE t.tid IN ('. $tids_query. ')', $tids);
+
+    while ($result = db_fetch_object($sql)) {
+      $map[$result->tid] = $result->tid;
+    }
+
+    if (!empty($map)) {
+      $path = '';
+
+      if (!empty($operator)) {
+        $cids = implode($operator, $map);
+        $path = 'category/'. $cids;
+        if ($depth != 0 && $op == 'page') {
+          $path .= '/'. $depth;
+        }
+        elseif ($op == 'feed') {
+          $path .= '/'. $depth. '/'. $op;
+        }
+      }
+      else {
+        $cid = reset($map);
+        $path = 'node/'. $cid;
+        if ($op == 'feed') {
+          $path .= '/'. $op;
+        }
+      }
+
+      drupal_goto($path);
+    }
+  }
+
+  drupal_not_found();
+}
+
+function taxonomy_term_path($term) {
+  return category_category_path($term);
+}
+
+function taxonomy_save_vocabulary(&$edit, $only_legacy = FALSE, $nid = NULL) {
+  global $user;
+  static $vids;
+  $edit['nodes'] = empty($edit['nodes']) ? array() : $edit['nodes'];
+
+  $node = new stdClass();
+  if (!$only_legacy) {
+    $node->title = $edit['name'];
+    $node->nid = $edit['vid'];
+    $node->type = 'category_cont';
+    $node->description = $edit['description'];
+    $node->help = $edit['help'] ? $edit['help'] : '';
+    $node->multiple = $edit['multiple'];
+    $node->required = $edit['required'];
+    $node->hierarchy = $edit['hierarchy'];
+    $node->has_relations = $edit['relations'];
+    $node->tags = $edit['tags'];
+    $node->weight = $edit['weight'];
+    $node->module = isset($edit['module']) ? $edit['module'] : 'category';
+    $node->nodes = $edit['nodes'];
+    // Force defaults
+    $node_options = variable_get('node_options_'. $node->type, array('status', 'promote'));
+    $node->status = in_array('status', $node_options);
+    $node->promote = in_array('promote', $node_options);
+    $node->sticky = in_array('sticky', $node_options);
+    $node->revision = in_array('revision', $node_options);
+    $node->name = $user->name ? $user->name : 0;
+    $node->date = date('j M Y H:i:s');
+    $node = node_submit($node);
+    node_save($node);
+  }
+
+  if (!isset($vids)) {
+    $vids = array();
+  }
+  $curr_vid = $edit['vid'] ? $edit['vid'] : ($nid ? $nid : $node->nid);
+  if (isset($vids[$curr_vid])) {
+    $edit['vid'] = $curr_vid;
+    return $vids[$curr_vid];
+  }
+
+  $vocab_saved = FALSE;
+
+  // BEGIN legacy taxonomy code that keeps the old DB tables up-to-date
+  if ($edit['vid'] && $edit['name']) {
+    if (variable_get('taxonomy_maintain_db', 1)) {
+      db_query("UPDATE {vocabulary} SET name = '%s', description = '%s', help = '%s', multiple = %d, required = %d, hierarchy = %d, relations = %d, tags = %d, weight = %d, module = '%s' WHERE vid = %d", $edit['name'], $edit['description'], $edit['help'], $edit['multiple'], $edit['required'], $edit['hierarchy'], $edit['relations'], $edit['tags'], $edit['weight'], isset($edit['module']) ? $edit['module'] : 'taxonomy', $edit['vid']);
+      $result = db_query('SELECT * FROM {vocabulary} WHERE vid = %d', $edit['vid']);
+      if (db_num_rows($result)) {
+        db_query("DELETE FROM {vocabulary_node_types} WHERE vid = %d", $edit['vid']);
+        foreach ($edit['nodes'] as $type => $selected) {
+          if ($selected) {
+            db_query("INSERT INTO {vocabulary_node_types} (vid, type) VALUES (%d, '%s')", $edit['vid'], $type);
+          }
+        }
+        $vocab_saved = TRUE;
+      }
+    }
+    if (!variable_get('taxonomy_maintain_db', 1) || $vocab_saved) {
+      module_invoke_all('taxonomy', 'update', 'vocabulary', $edit);
+      $vids[$curr_vid] = SAVED_UPDATED;
+    }
+  }
+  else if ($edit['vid']) {
+    $vids[$curr_vid] = variable_get('taxonomy_maintain_db', 1) ? taxonomy_del_vocabulary($edit['vid']) : SAVED_DELETED;
+  }
+
+  if (!$edit['vid'] || (variable_get('taxonomy_maintain_db', 1) && !$vocab_saved)) {
+    // The following line must be kept, even if the rest of this legacy code
+    // is deleted.
+    if (!$edit['vid']) {
+      $edit['vid'] = $node->nid ? $node->nid : $nid;
+    }
+
+    if (variable_get('taxonomy_maintain_db', 1)) {
+      db_query("INSERT INTO {vocabulary} (vid, name, description, help, multiple, required, hierarchy, relations, tags, weight, module) VALUES (%d, '%s', '%s', '%s', %d, %d, %d, %d, %d, %d, '%s')", $edit['vid'], $edit['name'], $edit['description'], $edit['help'], $edit['multiple'], $edit['required'], $edit['hierarchy'], $edit['relations'], $edit['tags'], $edit['weight'], isset($edit['module']) ? $edit['module'] : 'taxonomy');
+      foreach ($edit['nodes'] as $type => $selected) {
+        if ($selected) {
+          db_query("INSERT INTO {vocabulary_node_types} (vid, type) VALUES (%d, '%s')", $edit['vid'], $type);
+        }
+      }
+      if (db_num_rows(db_query("SELECT * FROM {sequences} WHERE name = '{vocabulary}_vid'"))) {
+        db_query("UPDATE {sequences} SET id = %d WHERE name = '{vocabulary}_vid'", $edit['vid']);
+      }
+      else {
+        db_query("INSERT INTO {sequences} (name, id) VALUES ('{vocabulary}_vid', %d)", $edit['vid']);
+      }
+    }
+    module_invoke_all('taxonomy', 'insert', 'vocabulary', $edit);
+    $vids[$curr_vid] = SAVED_NEW;
+  }
+
+  cache_clear_all();
+  // END legacy taxonomy code
+
+  return $vids[$curr_vid];
+}
+
+function taxonomy_del_vocabulary($vid, $only_legacy = FALSE) {
+  static $vids;
+
+  if (!isset($vids)) {
+    $vids = array();
+  }
+  if (isset($vids[$vid])) {
+    return;
+  }
+  else {
+    $vids[$vid] = TRUE;
+  }
+
+  if (!$only_legacy) {
+    node_delete($vid);
+  }
+
+  // BEGIN legacy taxonomy code that keeps the old DB tables up-to-date
+  $vocabulary = (array) taxonomy_get_vocabulary($vid);
+
+  if (variable_get('taxonomy_maintain_db', 1)) {
+    db_query('DELETE FROM {vocabulary} WHERE vid = %d', $vid);
+    db_query('DELETE FROM {vocabulary_node_types} WHERE vid = %d', $vid);
+  }
+
+  module_invoke_all('taxonomy', 'delete', 'vocabulary', $vocabulary);
+
+  cache_clear_all();
+  // END legacy taxonomy code
+
+  return SAVED_DELETED;
+}
+
+function taxonomy_save_term(&$edit, $only_legacy = FALSE, $nid = NULL) {
+  global $user;
+  static $tids;
+
+  $node = new stdClass();
+  if (!$only_legacy) {
+    $node->title = $edit['name'];
+    $node->nid = $edit['tid'];
+    $node->cnid = $edit['vid'];
+    $node->type = 'category_cat';
+    $node->description = $edit['description'];
+    $node->weight = $edit['weight'];
+    $node->relations = $edit['relations'];
+    $node->parents = $edit['parent'];
+    $node->synonyms = $edit['synonyms'];
+    // Force defaults
+    $node_options = variable_get('node_options_'. $node->type, array('status', 'promote'));
+    $node->status = in_array('status', $node_options);
+    $node->promote = in_array('promote', $node_options);
+    $node->sticky = in_array('sticky', $node_options);
+    $node->revision = in_array('revision', $node_options);
+    $node->name = $user->name ? $user->name : 0;
+    $node->date = date('j M Y H:i:s');
+    $node = node_submit($node);
+    node_save($node);
+  }
+
+  if (!isset($tids)) {
+    $tids = array();
+  }
+  $curr_tid = $edit['tid'] ? $edit['tid'] : ($nid ? $nid : $node->nid);
+  if (isset($tids[$curr_tid])) {
+    $edit['tid'] = $curr_tid;
+    return $tids[$curr_tid];
+  }
+
+  $term_saved = FALSE;
+
+  // BEGIN legacy taxonomy code that keeps the old DB tables up-to-date
+  if ($edit['tid'] && $edit['name']) {
+    if (variable_get('taxonomy_maintain_db', 1)) {
+      db_query("UPDATE {term_data} SET name = '%s', description = '%s', weight = %d WHERE tid = %d", $edit['name'], $edit['description'], $edit['weight'], $edit['tid']);
+
+      $result = db_query('SELECT * FROM {term_data} WHERE tid = %d', $edit['tid']);
+      if (db_num_rows($result)) {
+        $term_saved = TRUE;
+      }
+    }
+    if (!variable_get('taxonomy_maintain_db', 1) || $term_saved) {
+      module_invoke_all('taxonomy', 'update', 'term', $edit);
+      $tids[$curr_tid] = SAVED_UPDATED;
+    }
+  }
+  else if ($edit['tid']) {
+    $tids[$curr_tid] = variable_get('taxonomy_maintain_db', 1) ? taxonomy_del_term($edit['tid']) : SAVED_DELETED;
+  }
+
+  if (!$edit['tid'] || (variable_get('taxonomy_maintain_db', 1) && !$term_saved)) {
+    // The following line must be kept, even if the rest of this legacy code
+    // is deleted.
+    if (!$edit['tid']) {
+      $edit['tid'] = $node->nid ? $node->nid : $nid;
+    }
+
+    if (variable_get('taxonomy_maintain_db', 1)) {
+      db_query("INSERT INTO {term_data} (tid, name, description, vid, weight) VALUES (%d, '%s', '%s', %d, %d)", $edit['tid'], $edit['name'], $edit['description'], $edit['vid'], $edit['weight']);
+      if (db_num_rows(db_query("SELECT * FROM {sequences} WHERE name = '{term_data}_tid'"))) {
+        db_query("UPDATE {sequences} SET id = %d WHERE name = '{term_data}_tid'", $edit['tid']);
+      }
+      else {
+        db_query("INSERT INTO {sequences} (name, id) VALUES ('{term_data}_tid', %d)", $edit['tid']);
+      }
+    }
+    module_invoke_all('taxonomy', 'insert', 'term', $edit);
+    $tids[$curr_tid] = SAVED_NEW;
+  }
+
+  if (variable_get('taxonomy_maintain_db', 1)) {
+    db_query('DELETE FROM {term_relation} WHERE tid1 = %d OR tid2 = %d', $edit['tid'], $edit['tid']);
+    if ($edit['relations']) {
+      foreach ($edit['relations'] as $related_id) {
+        if ($related_id != 0) {
+          db_query('INSERT INTO {term_relation} (tid1, tid2) VALUES (%d, %d)', $edit['tid'], $related_id);
+        }
+      }
+    }
+
+    db_query('DELETE FROM {term_hierarchy} WHERE tid = %d', $edit['tid']);
+    if (!isset($edit['parent'])) {
+      $edit['parent'] = array(0);
+    }
+    if (is_array($edit['parent'])) {
+      foreach ($edit['parent'] as $parent) {
+        if (is_array($parent)) {
+          foreach ($parent as $tid) {
+            db_query('INSERT INTO {term_hierarchy} (tid, parent) VALUES (%d, %d)', $edit['tid'], $tid);
+          }
+        }
+        else {
+          db_query('INSERT INTO {term_hierarchy} (tid, parent) VALUES (%d, %d)', $edit['tid'], $parent);
+        }
+      }
+    }
+    else {
+      db_query('INSERT INTO {term_hierarchy} (tid, parent) VALUES (%d, %d)', $edit['tid'], $edit['parent']);
+    }
+
+    db_query('DELETE FROM {term_synonym} WHERE tid = %d', $edit['tid']);
+    if ($edit['synonyms']) {
+      $synonyms = $edit['synonyms'];
+      if (!is_array($edit['synonyms'])) {
+        $synonyms = explode("\n", str_replace("\r", '', $edit['synonyms']));
+      }
+      foreach ($synonyms as $synonym) {
+        if ($synonym) {
+          db_query("INSERT INTO {term_synonym} (tid, name) VALUES (%d, '%s')", $edit['tid'], chop($synonym));
+        }
+      }
+    }
+  }
+
+  cache_clear_all();
+  // END legacy taxonomy code
+
+  return $tids[$curr_tid];
+}
+
+function taxonomy_del_term($tid, $only_legacy = FALSE) {
+  static $tids;
+
+  if (!isset($tids)) {
+    $tids = array();
+  }
+  if (isset($tids[$tid])) {
+    return;
+  }
+  else {
+    $tids[$tid] = TRUE;
+  }
+
+  if (!$only_legacy) {
+    node_delete($tid);
+  }
+
+  // BEGIN legacy taxonomy code that keeps the old DB tables up-to-date
+
+  $term = (array) taxonomy_get_term($tid);
+
+  if (variable_get('taxonomy_maintain_db', 1)) {
+    db_query('DELETE FROM {term_data} WHERE tid = %d', $tid);
+    db_query('DELETE FROM {term_hierarchy} WHERE tid = %d', $tid);
+    db_query('DELETE FROM {term_relation} WHERE tid1 = %d OR tid2 = %d', $tid, $tid);
+    db_query('DELETE FROM {term_synonym} WHERE tid = %d', $tid);
+    db_query('DELETE FROM {term_node} WHERE tid = %d', $tid);
+  }
+
+  module_invoke_all('taxonomy', 'delete', 'term', $term);
+
+  cache_clear_all();
+  // END legacy taxonomy code
+
+  return SAVED_DELETED;
+}
+
+/**
+ * Generate a form element for selecting terms from a vocabulary.
+ */
+function taxonomy_form($vid, $value = 0, $help = NULL, $name = 'taxonomy') {
+  if ($name == 'taxonomy') {
+    $name = 'category';
+  }
+
+  return category_form_node($vid, $value, $help, $name);
+}
+
+/**
+ * Generate a set of options for selecting a term from all vocabularies. Can be
+ * passed to form_select.
+ */
+function taxonomy_form_all($free_tags = 0) {
+  return category_form_all($free_tags);
+}
+
+/**
+ * Return an array of all vocabulary objects.
+ *
+ * @param $type
+ *   If set, return only those vocabularies associated with this node type.
+ */
+function taxonomy_get_vocabularies($type = NULL) {
+  $vocabularies = array();
+
+  $containers = category_get_containers($type);
+  foreach ($containers as $key => $container) {
+    $vocabularies[$key] = new stdClass();
+    $vocabularies[$key]->vid = $container->cid;
+    $vocabularies[$key]->help = $container->help;
+    $vocabularies[$key]->module = $container->module;
+    $vocabularies[$key]->relations = $container->has_relations;
+    $vocabularies[$key]->synonyms = $container->has_synonyms;
+    $vocabularies[$key]->hierarchy = $container->hierarchy;
+    $vocabularies[$key]->multiple = $container->multiple;
+    $vocabularies[$key]->required = $container->required;
+    $vocabularies[$key]->tags = $container->tags;
+    $vocabularies[$key]->name = $container->title;
+    $vocabularies[$key]->nodes = $container->nodes;
+  }
+
+  return $vocabularies;
+}
+
+/**
+ * Find all terms associated to the given node, within one vocabulary.
+ */
+function taxonomy_node_get_terms_by_vocabulary($nid, $vid, $key = 'tid') {
+  if ($key == 'tid') {
+    $key = 'cid';
+  }
+
+  $categories = category_node_get_categories_by_container($nid, $vid, $key);
+  return _taxonomy_categories_into_terms($categories);
+}
+
+/**
+ * Find all terms associated to the given node, ordered by vocabulary and term weight.
+ */
+function taxonomy_node_get_terms($nid, $key = 'tid') {
+  if ($key == 'tid') {
+    $key = 'cid';
+  }
+
+  $categories = category_node_get_categories($nid, $key);
+  return _taxonomy_categories_into_terms($categories);
+}
+
+/**
+ * Save term associations for a given node.
+ */
+function taxonomy_node_save($nid, $terms, $node = NULL) {
+  if (empty($node)) {
+    $node = node_load($nid);
+  }
+
+  if (variable_get('taxonomy_maintain_db', 1)) {
+    // BEGIN legacy taxonomy code that keeps the old DB tables up-to-date
+    taxonomy_node_delete($nid);
+
+    // Free tagging vocabularies do not send their tids in the form,
+    // so we'll detect them here and process them independently.
+    if (isset($terms['tags'])) {
+      $typed_input = $terms['tags'];
+      unset($terms['tags']);
+
+      foreach ($typed_input as $vid => $vid_value) {
+        // This regexp allows the following types of user input:
+        // this, "somecmpany, llc", "and ""this"" w,o.rks", foo bar
+        $regexp = '%(?:^|,\ *)("(?>[^"]*)(?>""[^"]* )*"|(?: [^",]*))%x';
+        preg_match_all($regexp, $vid_value, $matches);
+        $typed_terms = $matches[1];
+
+        foreach ($typed_terms as $typed_term) {
+          // If a user has escaped a term (to demonstrate that it is a group,
+          // or includes a comma or quote character), we remove the escape
+          // formatting so to save the term into the DB as the user intends.
+          $typed_term = str_replace('""', '"', preg_replace('/^"(.*)"$/', '\1', $typed_term));
+          $typed_term = trim($typed_term);
+          if ($typed_term == "") { continue; }
+
+          // See if the term exists in the chosen vocabulary
+          // and return the tid, otherwise, add a new record.
+          $possibilities = taxonomy_get_term_by_name($typed_term);
+          $typed_term_tid = NULL; // tid match if any.
+          foreach ($possibilities as $possibility) {
+            if ($possibility->vid == $vid) {
+              $typed_term_tid = $possibility->tid;
+            }
+          }
+
+          if (!$typed_term_tid) {
+            $edit = array('vid' => $vid, 'name' => $typed_term);
+            $status = taxonomy_save_term($edit, TRUE);
+            $typed_term_tid = $edit['tid'];
+          }
+
+          db_query('INSERT INTO {term_node} (nid, tid) VALUES (%d, %d)', $nid, $typed_term_tid);
+        }
+      }
+    }
+    if (isset($terms['legacy'])) {
+      foreach ($terms['legacy'] as $tid) {
+        if (!empty($tid)) {
+          db_query('INSERT INTO {term_node} (nid, tid) VALUES (%d, %d)', $tid, $nid);
+        }
+      }
+    }
+    if (is_array($terms)) {
+      foreach ($terms as $key => $term) {
+        if ($key != 'tags' && $key != 'legacy') {
+          if (is_array($term)) {
+            foreach ($term as $tid) {
+              if (!empty($tid)) {
+                db_query('INSERT INTO {term_node} (nid, tid) VALUES (%d, %d)', $nid, $tid);
+              }
+            }
+          }
+          else if (isset($term->tid)) {
+            db_query('INSERT INTO {term_node} (nid, tid) VALUES (%d, %d)', $nid, $term->tid);
+          }
+          else if ($term) {
+            db_query('INSERT INTO {term_node} (nid, tid) VALUES (%d, %d)', $nid, $term);
+          }
+        }
+      }
+    }
+    // END legacy taxonomy code
+  }
+
+  category_node_save($node, TRUE);
+}
+
+/**
+ * Remove associations of a node to its terms.
+ */
+function taxonomy_node_delete($nid) {
+  category_node_delete($nid, TRUE);
+
+  if (variable_get('taxonomy_maintain_db', 1)) {
+    // BEGIN legacy taxonomy code that keeps the old DB tables up-to-date
+    db_query('DELETE FROM {term_node} WHERE nid = %d', $nid);
+    // END legacy taxonomy code
+  }
+}
+
+/**
+ * Implementation of hook_node_type().
+ */
+function taxonomy_node_type($op, $info) {
+  if (variable_get('taxonomy_maintain_db', 1)) {
+    if ($op == 'update' && !empty($info->old_type) && $info->type != $info->old_type) {
+      db_query("UPDATE {vocabulary_node_types} SET type = '%s' WHERE type = '%s'", $info->type, $info->old_type);
+    }
+    elseif ($op == 'delete') {
+      db_query("DELETE FROM {vocabulary_node_types} WHERE type = '%s'", $info->type);
+    }
+  }
+}
+
+/**
+ * Find all term objects related to a given term ID.
+ */
+function taxonomy_get_related($tid, $key = 'tid') {
+  if ($key == 'tid') {
+    $key = 'cid';
+  }
+
+  $categories = category_get_related($tid, $key);
+  $terms = array();
+
+  foreach ($categories as $key => $category) {
+    $terms[$key] = _taxonomy_category_into_term($category);
+    $terms[$key]->tid1 = $category->cid1;
+    $terms[$key]->tid2 = $category->cid2;
+  }
+
+  return $terms;
+}
+
+/**
+ * Find all parents of a given term ID.
+ */
+function taxonomy_get_parents($tid, $key = 'tid') {
+  if ($key == 'tid') {
+    $key = 'cid';
+  }
+
+  $categories = category_get_parents($tid, $key, FALSE);
+  $terms = _taxonomy_categories_into_terms($categories);
+
+  $term = taxonomy_get_term($tid);
+  foreach ($terms as $key => $value) {
+    if ($value->tid == $term->vid) {
+      unset($terms[$key]);
+    }
+
+    if (isset($terms[$key])) {
+      unset($terms[$key]);
+      $terms[$value->tid] = $value;
+    }
+  }
+
+  return $terms;
+}
+
+/**
+ * Find all ancestors of a given term ID.
+ */
+function taxonomy_get_parents_all($tid) {
+  $categories = category_get_parents_all($tid);
+  $terms = _taxonomy_categories_into_terms($categories);
+
+  $term = taxonomy_get_term($tid);
+  foreach ($terms as $key => $value) {
+    if ($value->tid == $term->vid) {
+      unset($terms[$key]);
+    }
+  }
+
+  return $terms;
+}
+
+/**
+ * Find all children of a term ID.
+ */
+function taxonomy_get_children($tid, $vid = 0, $key = 'tid') {
+  if ($key == 'tid') {
+    $key = 'cid';
+  }
+
+  $categories = category_get_children($tid, $vid, $key);
+  return _taxonomy_categories_into_terms($categories);
+}
+
+/**
+ * Create a hierarchical representation of a vocabulary.
+ *
+ * @param $vid
+ *   Which vocabulary to generate the tree for.
+ *
+ * @param $parent
+ *   The term ID under which to generate the tree. If 0, generate the tree
+ *   for the entire vocabulary.
+ *
+ * @param $depth
+ *   Internal use only.
+ *
+ * @param $max_depth
+ *   The number of levels of the tree to return. Leave NULL to return all levels.
+ *
+ * @return
+ *   An array of all term objects in the tree. Each term object is extended
+ *   to have "depth" and "parents" attributes in addition to its normal ones.
+ */
+function taxonomy_get_tree($vid, $parent = 0, $depth = -1, $max_depth = NULL) {
+  if ($parent === 0) {
+    $parent = NULL;
+  }
+  elseif ($parent === NULL) {
+    $parent = 0;
+  }
+
+  $categories = category_get_tree($vid, $parent, $depth, $max_depth);
+  $terms = array();
+
+  foreach ($categories as $key => $category) {
+    $terms[$key] = _taxonomy_category_into_term($category);
+    $terms[$key]->depth = $category->depth;
+
+    if (!empty($category->parents) && is_array($category->parents)) {
+      foreach ($category->parents as $parent_key => $parent_id) {
+        if (category_get_container($parent_id)) {
+          unset($category->parents[$parent_key]);
+        }
+      }
+    }
+    if (empty($category->parents)) {
+      $category->parents = array(0);
+    }
+
+    $terms[$key]->parents = $category->parents;
+  }
+
+  return $terms;
+}
+
+/**
+ * Return an array of synonyms of the given term ID.
+ */
+function taxonomy_get_synonyms($tid) {
+  return category_get_synonyms($tid);
+}
+
+/**
+ * Return the term object that has the given string as a synonym.
+ */
+function taxonomy_get_synonym_root($synonym) {
+  $category = category_get_synonym_root($synonym);
+  return _taxonomy_category_into_term($category);
+}
+
+/**
+ * Given a term id, count the number of published nodes in it.
+ */
+function taxonomy_term_count_nodes($tid, $type = 0) {
+  return category_category_count_nodes($tid, $type);
+}
+
+/**
+ * Try to map a string to an existing term, as for glossary use.
+ *
+ * Provides a case-insensitive and trimmed mapping, to maximize the
+ * likelihood of a successful match.
+ *
+ * @param name
+ *   Name of the term to search for.
+ *
+ * @return
+ *   An array of matching term objects.
+ */
+function taxonomy_get_term_by_name($name) {
+  $categories = category_get_category_by_name($name);
+  $return = array();
+  foreach ($categories as $category) {
+    $return[] = _taxonomy_category_into_term($category);
+  }
+  return $return;
+}
+
+/**
+ * Return the vocabulary object matching a vocabulary ID.
+ */
+function taxonomy_get_vocabulary($vid) {
+  $container = category_get_container($vid);
+
+  $vocabulary = array();
+  $vocabulary['vid'] = $container->cid;
+  $vocabulary['name'] = $container->title;
+  $vocabulary['description'] = $container->cont_description;
+  $vocabulary['help'] = $container->help;
+  $vocabulary['relations'] = $container->has_relations;
+  $vocabulary['hierarchy'] = $container->hierarchy;
+  $vocabulary['multiple'] = $container->multiple;
+  $vocabulary['required'] = $container->required;
+  $vocabulary['tags'] = $container->tags;
+  $vocabulary['module'] = $container->module;
+  $vocabulary['weight'] = $container->cont_weight;
+  $vocabulary['nodes'] = $container->nodes;
+
+  return $vocabulary;
+}
+
+/**
+ * Return the term object matching a term ID.
+ */
+function taxonomy_get_term($tid) {
+  $category = category_get_category($tid);
+  return _taxonomy_category_into_term($category);
+}
+
+/**
+ * Finds all nodes that match selected taxonomy conditions.
+ *
+ * @param $tids
+ *   An array of term IDs to match.
+ * @param $operator
+ *   How to interpret multiple IDs in the array. Can be "or" or "and".
+ * @param $depth
+ *   How many levels deep to traverse the taxonomy tree. Can be a nonnegative
+ *   integer or "all".
+ * @param $pager
+ *   Whether the nodes are to be used with a pager (the case on most Drupal
+ *   pages) or not (in an XML feed, for example).
+ * @param $order
+ *   The order clause for the query that retrieve the nodes.
+ * @return
+ *   A resource identifier pointing to the query results.
+ */
+function taxonomy_select_nodes($tids = array(), $operator = 'or', $depth = 0, $pager = TRUE, $order = 'n.sticky DESC, n.created DESC') {
+  return category_select_nodes($tids, $operator, $depth, $pager, FALSE, $order);
+}
+
+/**
+ * Accepts the result of a pager_query() call, such as that performed by
+ * taxonomy_select_nodes(), and formats each node along with a pager.
+*/
+function taxonomy_render_nodes($result) {
+  return category_render_nodes($result);
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function taxonomy_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+  switch ($op) {
+    case 'load':
+      $node->taxonomy = taxonomy_node_get_terms($node->nid);
+      break;
+    case 'insert':
+      if (category_is_cat_or_cont($node->nid)) {
+        $type = category_node_get_type($node);
+        $is_cat = $type == 'category_cat';
+        if ($is_cat) {
+          taxonomy_save_term($edit = _taxonomy_prepare_edit_term($node), TRUE, $node->nid);
+        }
+        else {
+          taxonomy_save_vocabulary($edit = _taxonomy_prepare_edit_vocabulary($node), TRUE, $node->nid);
+        }
+      }
+      if (empty($node->taxonomy)) {
+        if (!empty($node->category)) {
+          $node->taxonomy = $node->category;
+        }
+        else {
+          $node->taxonomy = taxonomy_node_get_terms($node->nid);
+        }
+      }
+      taxonomy_node_save($node->nid, $node->taxonomy, $node);
+      break;
+    case 'update':
+      if (category_is_cat_or_cont($node->nid)) {
+        $type = category_node_get_type($node);
+        $is_cat = $type == 'category_cat';
+        if ($is_cat) {
+          taxonomy_save_term($edit = _taxonomy_prepare_edit_term($node, TRUE), TRUE);
+        }
+        else {
+          taxonomy_save_vocabulary($edit = _taxonomy_prepare_edit_vocabulary($node, TRUE), TRUE);
+        }
+      }
+      if (empty($node->taxonomy)) {
+        if (!empty($node->category)) {
+          $node->taxonomy = $node->category;
+        }
+        else {
+          $node->taxonomy = taxonomy_node_get_terms($node->nid);
+        }
+      }
+      taxonomy_node_save($node->nid, $node->taxonomy, $node);
+      break;
+    case 'delete':
+      if (category_is_cat_or_cont($node->nid)) {
+        $type = category_node_get_type($node);
+        $is_cat = $type == 'category_cat';
+        if ($is_cat) {
+          taxonomy_del_term($node->nid);
+        }
+        else {
+          taxonomy_del_vocabulary($node->nid);
+        }
+      }
+      taxonomy_node_delete($node->nid);
+      break;
+  }
+}
+
+function taxonomy_terms_parse_string($str_tids) {
+  $terms = category_categories_parse_string($str_tids);
+  $terms['tids'] = $terms['cids'];
+  unset($terms['cids']);
+
+  return $terms;
+}
+
+/**
+ * Place assigned categories in the form as taxonomy terms.
+ */
+function taxonomy_form_alter($form_id, &$form) {
+  if (!isset($form['type']) || $form['type']['#value'] .'_node_form' != $form_id) {
+    return;
+  }
+
+  $edit = $_POST['edit'];
+
+  $form['taxonomy'] = array(
+    '#type' => 'value',
+    '#value' => $edit['category'],
+  );
+}
+
+/**
+ * Provides category information for rss feeds
+ */
+function taxonomy_rss_item($node) {
+  return category_rss_item($node);
+}
+
+/**
+ * Implementation of hook_help().
+ */
+function taxonomy_help($section) {
+  switch ($section) {
+    case 'admin/help#taxonomy':
+      return t('<p>This is a wrapper module to provide a compatibility layer between the taxonomy module and the category module. Modules that depend on the taxonomy module should function correctly with this wrapper module enabled, as it routes all taxonomy requests to the category API, and converts category data types into taxonomy data types. The taxonomy module user interface is not available with this wrapper module: you should use the category module user interface instead. For further assistance, see the <a href="!category">category module help page</a>.</p>', array('!category' => url('admin/help', NULL, 'category')));
+  }
+}
+
+/**
+ * Implementation of hook_category().
+ */
+function taxonomy_category($op, $node = NULL) {
+  switch ($op) {
+    case 'settings':
+      // Menu item settings
+      $form['taxonomy'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Taxonomy wrapper settings'),
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+        '#weight' => 8,
+      );
+      $form['taxonomy']['taxonomy_maintain_db'] = array(
+        '#type' => 'radios',
+        '#title' => t('Maintain category data in taxonomy tables'),
+        '#default_value' =>  variable_get('taxonomy_maintain_db', '1'),
+        '#options' => array('1' => t('Enabled'), '0' => t('Disabled')),
+        '#description' => t('Maintains a mirror copy of all your categories and containers in the taxonomy module\'s database tables, as equivalent terms and vocabularies. It is recommended that you enable this setting, as many taxonomy-dependent modules directly access the taxonomy database tables, instead of using the taxonomy function interface.')
+      );
+
+      return $form;
+      break;
+  }
+}
+
+function _taxonomy_term_select($title, $name, $value, $vocabulary_id, $description, $multiple, $blank, $exclude = array()) {
+  return _category_node_select($title, $value, $vocabulary_id, $description, $multiple, $blank, $exclude);
+}
+
+function _taxonomy_confirm_del_term($tid) {
+  $term = taxonomy_get_term($tid);
+
+  $form['type'] = array('#type' => 'hidden', '#value' => 'term');
+  $form['tid'] = array('#type' => 'hidden', '#value' => $tid);
+  return confirm_form('term_confirm_delete', $form,
+                  t('Are you sure you want to delete the term %title?',
+                  array('%title' => $term->name)),
+                  'admin/category',
+                  t('This action cannot be undone.'),
+                  t('Delete'),
+                  t('Cancel'));
+}
+
+/**
+ * Helper function for array_map purposes.
+ */
+function _taxonomy_get_tid_from_term($term) {
+  return $term->tid;
+}
+
+/**
+ * Converts an array of category objects (as returned by many category API
+ * functions) into an array of term objects.
+ *
+ * @param $categories
+ *   An array of category objects, where each object has: cid; cnid; title;
+ *   description; and weight.
+ *
+ * @return
+ *   An array of corresponding term objects, where each term has: tid; vid;
+ *   name; description; and weight.
+ */
+function _taxonomy_categories_into_terms($categories = array()) {
+  $terms = array();
+
+  foreach ($categories as $key => $category) {
+    $terms[$key] = _taxonomy_category_into_term($category);
+  }
+
+  return $terms;
+}
+
+/**
+ * Converts a category object (as returned by many category API
+ * functions) into a term object.
+ *
+ * @param $category
+ *   A category object, with these properties: cid; cnid; title;
+ *   description; and weight.
+ *
+ * @return
+ *   A corresponding term object, with these properties: tid; vid;
+ *   name; description; and weight.
+ */
+function _taxonomy_category_into_term($category) {
+  $term = new stdClass();
+
+  $term->tid = $category->cid;
+  $term->vid = $category->cnid;
+  $term->name = $category->title;
+  $term->description = $category->description;
+  $term->weight = $category->weight;
+
+  return $term;
+}
+
+/**
+ * Converts a category node into a term array.
+ *
+ * @param $node
+ *   A category node object.
+ *
+ * @return
+ *   A corresponding term array.
+ */
+function _taxonomy_prepare_edit_term($node, $update = FALSE) {
+  $edit['name'] = $node->title;
+  $edit['vid'] = $node->cnid;
+  $edit['description'] = $node->description;
+  $edit['weight'] = $node->weight;
+  $edit['relations'] = $node->relations;
+  $edit['parent'] = $node->parents;
+  $edit['synonyms'] = $node->synonyms;
+
+  if ($update) {
+    $edit['tid'] = $node->nid;
+  }
+
+  if (is_array($edit['parent'])) {
+    if (empty($edit['parent']) || reset($edit['parent']) == $edit['vid']) {
+      unset($edit['parent']);
+      $edit['parent'] = 0;
+    }
+    else {
+      foreach ($edit['parent'] as $key => $tid) {
+        $category = category_get_category($tid);
+        if ($category->cnid != $edit['vid']) {
+          unset($edit['parent'][$key]);
+        }
+      }
+      if (empty($edit['parent'])) {
+        unset($edit['parent']);
+        $edit['parent'] = 0;
+      }
+    }
+  }
+  else {
+    $category = category_get_category($edit['parent']);
+    if ($category->cnid != $edit['vid']) {
+      $edit['parent'] = 0;
+    }
+  }
+
+  return $edit;
+}
+
+/**
+ * Converts a container node into a vocabulary array.
+ *
+ * @param $node
+ *   A container node object.
+ *
+ * @return
+ *   A corresponding vocabulary array.
+ */
+function _taxonomy_prepare_edit_vocabulary($node, $update = FALSE) {
+  $edit['name'] = $node->title;
+  $edit['description'] = $node->description;
+  $edit['help'] = $node->help ? $node->help : '';
+  $edit['multiple'] = $node->multiple;
+  $edit['required'] = $node->required;
+  $edit['hierarchy'] = $node->hierarchy;
+  $edit['relations'] = $node->has_relations;
+  $edit['tags'] = $node->tags;
+  $edit['weight'] = $node->weight;
+  $edit['module'] = isset($node->module) ? $node->module : 'category';
+
+  if (!isset($node->nodes) || !is_array($node->nodes)) {
+    $node->nodes = array($node->nodes);
+  }
+  if (empty($node->nodes[0])) {
+    unset($node->nodes[0]);
+  }
+  $edit['nodes'] = $node->nodes;
+
+  if ($update) {
+    $edit['vid'] = $node->nid;
+  }
+
+  return $edit;
+}

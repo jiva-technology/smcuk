@@ -1,0 +1,483 @@
+<?php
+// $Id: category_display.module,v 1.33 2007/01/05 15:31:15 jaza Exp $
+
+/**
+ * @file
+ * Allows additional output to be displayed and toggled for nodes controlled
+ * by the category module.
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function category_display_help($section) {
+  switch ($section) {
+    case 'admin/help#category_display':
+      return t('<p>The category display module allows additional output to be displayed and toggled for category and container nodes.</p><p>This module requires the category module.</p>');
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function category_display_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+  switch ($op) {
+    case 'load':
+      if (category_is_cat_or_cont($node->nid)) {
+        $type = category_node_get_type($node);
+        $is_cat = $type == 'category_cat';
+        if (!$is_cat) {
+          return (array)category_display_cont_load($node->nid, $node);
+        }
+        else {
+          return (array)category_display_cont_load($node->cnid, $node);
+        }
+      }
+      break;
+    case 'insert':
+    case 'update':
+      $op = $_POST['op'];
+      $submit_values = array(
+        'insert' => t('Add to category outline'),
+        'update' => t('Update category outline'),
+        'delete' => t('Remove from category outline'),
+      );
+      if (in_array($op, $submit_values)) {
+        switch ($op) {
+          case $submit_values['insert']:
+          case $submit_values['update']:
+            category_display_cont_update($node);
+            break;
+          case $submit_values['delete']:
+            category_display_cont_delete($node->nid);
+            break;
+        }
+      }
+      elseif (category_is_cat_or_cont($node->nid, TRUE)) {
+        $type = category_node_get_type($node);
+        $is_cat = $type == 'category_cat';
+        if (!$is_cat) {
+          category_display_cont_update($node);
+        }
+      }
+      break;
+    case 'delete':
+      if (category_is_cat_or_cont($node->nid)) {
+        $type = category_node_get_type($node);
+        $is_cat = $type == 'category_cat';
+        if (!$is_cat) {
+          category_display_cont_delete($node->nid);
+        }
+      }
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_category().
+ */
+function category_display_category($op, $node = NULL) {
+  switch ($op) {
+    case 'form':
+      // Display settings
+      $form['category_display'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Category display settings'),
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+      );
+      $form['category_display']['navlinks'] = array(
+        '#type' => 'radios',
+        '#title' => t('Show prev, next, and up links'),
+        '#default_value' => isset($node->navlinks) ? $node->navlinks : 1,
+        '#options' => array(0 => t('Disabled'), 1 => t('Enabled')),
+        '#description' => t('Toggles display of navigation links (prev, next, and up) for child categories.'),
+      );
+      $navdist_default = array();
+      if ($node->navlinks_before) {
+        $navdist_default[] = 'navlinks_before';
+      }
+      if ($node->navlinks_after) {
+        $navdist_default[] = 'navlinks_after';
+      }
+      $form['category_display']['navlinks_distant'] = array(
+        '#type' => 'checkboxes',
+        '#title' => t('Link to distant neighbours'),
+        '#default_value' => $navdist_default,
+        '#options' => array('navlinks_before' => t('Before (as a \'prev\' or \'up\' link)'), 'navlinks_after' => t('After (as a \'next\' link)')),
+        '#description' => t('Allows the navigation links to point to distant neighbors (i.e. other containers, or categories in other containers). If the \'show prev, next, and up links\' setting is not enabled, then this setting has no effect. Additionally, in order for this setting to have an effect, it must be set correspondingly in the containers for distant neighbors. For example, if this container has its \'before\' link to distant neighbors enabled, <em>and</em> the container that holds the \'before\' distant neighbor has its \'after\' link to distant neighbors enabled (or vice versa), then the links may point to nodes in a different container. If this container has its \'hidden\' attribute <em>disabled</em>, then the container itself has navigation links displayed on it, and is also linked to by its neighboring categories and containers; note that if the \'hidden\' attribute is <em>enabled</em>, the container\'s first direct child links and is linked to neighboring categories and containers <em>instead</em> of the container itself.'),
+      );
+
+      $form['category_display']['toc_for_cats'] = array(
+        '#type' => 'radios',
+        '#title' => t('Display TOC within this container'),
+        '#default_value' => isset($node->toc_for_cats) ? $node->toc_for_cats : 1,
+        '#options' => array(0 => t('Disabled'), 1 => t('Enabled')),
+        '#description' => t('Automatically displays a table of contents for child categories. If this container has its \'hidden\' attribute <em>disabled</em>, then the container itself has a TOC displayed on it, and is also listed on the TOC of its parent(s); note that if the \'hidden\' attribute is <em>enabled</em>, the container\'s direct children are displayed on the TOC of its parent(s) <em>instead</em> of the container itself.'),
+      );
+      $form['category_display']['toc_depth'] = array(
+        '#type' => 'weight',
+        '#title' => t('Depth of TOC'),
+        '#default_value' => isset($node->toc_depth) ? $node->toc_depth : 0,
+        '#delta' => 10,
+        '#description' => t('Depth of the table of contents for this container and its categories. Local and distant children are included in the TOC. Set this to a negative value to reflect an infinite depth.'),
+      );
+      $form['category_display']['toc_nodecount'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Show assigned node count in TOC'),
+        '#default_value' => isset($node->toc_nodecount) ? $node->toc_nodecount : 0,
+        '#description' => t('Toggles display of the number of assigned nodes available, for each category listed in the table of contents. This number always reflects a depth of 0: that is, it only indicates nodes that are assigned directly to the category in question; it does not include nodes that are assigned to child categories. For this reason, the assigned node count is never shown for links to containers.'),
+      );
+
+      $form['category_display']['desc_as_body'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Use description as body text'),
+        '#default_value' => isset($node->desc_as_body) ? $node->desc_as_body : 0,
+        '#description' => t('Loads the description for this container and its categories into the body text field, if the body text is empty and a description has been provided. This is useful if you need to use the same text for both fields: instead of entering the text twice, just enter it once as a description.'),
+      );
+      $form['category_display']['nodelinks'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Show links to categories on assigned nodes'),
+        '#default_value' => isset($node->nodelinks) ? $node->nodelinks : 1,
+        '#description' => t('Toggles display of category links for nodes that have been assigned to one or more categories of this container.'),
+      );
+      $form['category_display']['emptymsg'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Show message if no posts'),
+        '#default_value' => isset($node->emptymsg) ? $node->emptymsg : 1,
+        '#description' => t('Toggles display of a message on the page for this container, and the pages for its categories, indicating that there are no assigned nodes. This message is never displayed on the container page, if this container has its depth set to 0.'),
+      );
+      $form['category_display']['show_listing'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Show node listings'),
+        '#default_value' => isset($node->show_listing) ? $node->show_listing : 1,
+        '#description' => t('Toggles display of node listings on category and container pages. If this setting is disabled, then the message for a category with no posts will never be shown either. Disabling this setting will also hide any alternative node listing that may be getting generated by the views module.'),
+      );
+
+      return $form;
+      break;
+    case 'view':
+      return array(
+        'category_display_navigation' => array(
+          '#value' => theme('category_display_navigation', $node),
+          '#weight' => 5
+        )
+      );
+  }
+}
+
+/**
+ * Implementation of hook_category_legacy().
+ */
+function category_display_category_legacy($op, &$vocabularies, $edit = NULL) {
+  switch ($op) {
+    case 'import_taxonomy_prepare':
+    case 'import_book_prepare':
+      foreach ($vocabularies as $vid => $vocab) {
+        $fields = array('navlinks', 'toc_for_cats', 'toc_depth', 'nodelinks', 'emptymsg', 'show_listing');
+        foreach ($fields as $field) {
+          $vocabularies[$vid][$field] = $edit[$field];
+        }
+        $vocabularies[$vid]['navlinks_before'] = ($edit['navlinks_distant']['navlinks_before'] ? 1 : 0);
+        $vocabularies[$vid]['navlinks_after'] = ($edit['navlinks_distant']['navlinks_after'] ? 1 : 0);
+      }
+      break;
+  }
+}
+
+/**
+ * Responds to the load of an existing container, by loading the container's
+ * display settings from the database.
+ *
+ * @param $nid
+ *   The node ID of the container being loaded.
+ *
+ * @return
+ *   The display settings for the specified node, or 0 if none could be found.
+ */
+function category_display_cont_load($nid, $node = NULL) {
+  static $containers;
+
+  // Grab all settings in one query, and store in a simple cache
+  if (!isset($containers)) {
+    $containers = array();
+    $result = db_query("SELECT * FROM {category_display}");
+    while ($container = db_fetch_object($result)) {
+      $containers[$container->cid] = $container;
+      unset($containers[$container->cid]->cid);
+    }
+  }
+
+  if (isset($containers[$nid])) {
+    // Use description as body text if necessary
+    if ($containers[$nid]->desc_as_body && isset($node)) {
+      if (empty($node->body) && !empty($node->description)) {
+        $temp_container = $containers[$nid];
+        $temp_container->body = $node->description;
+        $temp_container->body_is_desc = TRUE;
+        return $temp_container;
+      }
+    }
+    return $containers[$nid];
+  }
+  else {
+    return 0;
+  }
+}
+
+/**
+ * Responds to the insert of update of an existing container, by updating the
+ * container's display settings in the database.
+ *
+ * @param $node
+ *   The container node being inserted or updated.
+ */
+function category_display_cont_update($node) {
+  $node->cid = $node->nid;
+  $node->navlinks_before = ($node->navlinks_distant['navlinks_before'] ? 1 : 0);
+  $node->navlinks_after = ($node->navlinks_distant['navlinks_after'] ? 1 : 0);
+  $fields = array(
+    'cid',
+    'toc_for_cats',
+    'toc_depth',
+    'toc_nodecount',
+    'navlinks',
+    'navlinks_before',
+    'navlinks_after',
+    'desc_as_body',
+    'nodelinks',
+    'emptymsg',
+    'show_listing',
+  );
+
+  $data_exists = (db_num_rows(db_query('SELECT * FROM {category_display} WHERE cid = %d', $node->nid)) > 0);
+  if ($data_exists) {
+    db_query('UPDATE {category_display} SET '. _category_container_update($node, $fields) .' WHERE cid = %d', $node->nid);
+  }
+  else {
+    db_query('INSERT INTO {category_display} '. _category_container_insert($node, 1, $fields) .' VALUES '. _category_container_insert($node, 2, $fields));
+  }
+}
+
+/**
+ * Responds to the delete of an existing container, by deleting the container's
+ * display settings in the database.
+ *
+ * @param $nid
+ *   The node ID of the container being deleted.
+ */
+function category_display_cont_delete($nid) {
+  db_query('DELETE FROM {category_display} WHERE cid = %d', $nid);
+}
+
+/**
+ * Returns an HTML nested list (wrapped in a menu-class div) representing the
+ * category nodes as a tree.
+ */
+function category_display_toc_recurse($parent = 0, $depth = 0, $orig_node = NULL, $curr_depth = 0) {
+  $output = '';
+  $categories = category_get_children($parent);
+
+  foreach ($categories as $category) {
+    $is_cat = !empty($category->cnid);
+    $cat = category_get_container($is_cat ? $category->cnid : $category->cid);
+    unset($cat->cid);
+    unset($cat->title);
+    foreach ($cat as $key => $value) {
+      $category->$key = $value;
+    }
+
+    if (!$is_cat && $category->hidden_cont) {
+      $output .= category_display_toc_recurse($category->cid, $depth, $orig_node, $curr_depth);
+    }
+    elseif (($child_array = category_get_children($category->cid)) && !empty($child_array)) {
+      if ($curr_depth < $depth) {
+        $output .= '<li class="expanded">'. theme('category_display_toc_link', $category, $orig_node);
+        $output .= '<ul class="menu">'. category_display_toc_recurse($category->cid, $depth, $orig_node, $curr_depth+1). '</ul>';
+        $output .= '</li>';
+      }
+      else {
+        $output .= '<li class="collapsed">'. theme('category_display_toc_link', $category, $orig_node). '</li>';
+      }
+    }
+    else {
+      $output .= '<li class="leaf">'. theme('category_display_toc_link', $category, $orig_node) .'</li>';
+    }
+  }
+
+  return $output;
+}
+
+/**
+ * Returns an HTML nested list (wrapped in a menu-class div) representing
+ * the category nodes as a tree.
+ */
+function category_display_toc($node) {
+  $depth = $node->toc_depth;
+  if ($depth < 0) {
+    $depth = 100;
+  }
+  if ($toc = category_display_toc_recurse($node->nid, $depth, $node)) {
+    return '<ul class="menu">'. $toc .'</ul>';
+  }
+}
+
+/**
+ * Prepares both the table of contents and the forward/backward
+ * navigation for a node presented as a category or container.
+ *
+ * @ingroup themeable
+ */
+function theme_category_display_navigation($node) {
+  $output = '';
+
+  if ($node->nid) {
+    $show_toc = FALSE;
+    $navlinks = FALSE;
+
+    $type = category_node_get_type($node);
+    $is_cat = $type == 'category_cat';
+    if ($node->toc_for_cats && ($is_cat || !$node->hidden_cont)) {
+      $show_toc = TRUE;
+    }
+    if ($node->navlinks && ($is_cat || !$node->hidden_cont)) {
+      $navlinks = TRUE;
+    }
+
+    if ($show_toc || $navlinks) {
+      if ($show_toc) {
+        $toc = category_display_toc($node);
+      }
+
+      if ($navlinks) {
+        $prev_obj = category_prev($node->nid);
+        if ($prev_obj) {
+          $prev = _category_display_navlinks($prev_obj->cid, 'prev', $node);
+          if ($prev) {
+            drupal_add_link(array('rel' => 'prev', 'href' => url('node/'. $prev->cid)));
+            $links .= l(t('‹ ') . $prev->title .' ', 'node/'. $prev->cid, array('class' => 'page-previous', 'title' => t('Go to previous page')));
+          }
+        }
+
+        if (is_array($node->parents)) {
+          $parent_obj = $node->parents[0];
+          if (!empty($parent_obj)) {
+            $parent = _category_display_navlinks($parent_obj, 'get_parents', $node);
+            if ($parent) {
+              drupal_add_link(array('rel' => 'up', 'href' => url('node/'. $parent->cid)));
+              $links .= l(t('up'), 'node/'. $parent->cid, array('class' => 'page-up', 'title' => t('Go to parent page')));
+            }
+          }
+        }
+
+        $next_obj = category_next($node->nid);
+        if ($next_obj) {
+          $next = _category_display_navlinks($next_obj->cid, 'next', $node);
+          if ($next) {
+            drupal_add_link(array('rel' => 'next', 'href' => url('node/'. $next->cid)));
+            $links .= l(' '. $next->title . t(' ›'), 'node/'. $next->cid, array('class' => 'page-next', 'title' => t('Go to next page')));
+          }
+        }
+      }
+
+      if (isset($toc) || isset($links)) {
+        drupal_add_css(drupal_get_path('module', 'category_display'). '/category_display.css');
+        $output .= '<div class="category-navigation">';
+        if (isset($toc)) {
+          $output .= $toc;
+        }
+        if (isset($links)) {
+          $output .= '<div class="page-links clear-block">'. $links .'</div>';
+        }
+        $output .= '</div>';
+      }
+    }
+  }
+
+  return $output;
+}
+
+/**
+ * Formats a link in a category's TOC display, and appends an assigned node
+ * count if applicable.
+ *
+ * @ingroup themeable
+ */
+function theme_category_display_toc_link($category, $orig_node) {
+  return l($category->title, 'node/'. $category->cid). ($orig_node->toc_nodecount && $category->cnid ? ' <span class="category-toc-node-count">('. category_category_count_nodes($category->cid). ')</span>' : '');
+}
+
+/**
+ * Determines whether or not a particular navigation link (prev, next, or up)
+ * should be shown.
+ *
+ * @param $item
+ *   The ID of the node that is being linked to.
+ * @param $func
+ *   The suffix of the function to call when lookin for alternate neighbours
+ *   to link to (either prev, next, or get_children).
+ *
+ * @return
+ *   The ID of the new node that should be linked to, or boolean FALSE.
+ */
+function _category_display_navlinks($nid, $func, $orig_node = NULL) {
+  if ($nid) {
+    $node = node_load($nid);
+    $type = category_node_get_type($node);
+    $is_cat = $type == 'category_cat';
+    if ($node->navlinks) {
+      if ($is_cat || !$node->hidden_cont) {
+        $dist_check = FALSE;
+        if (!empty($orig_node)) {
+          $cnid = ($is_cat ? $node->cnid : $node->nid);
+          $orig_cnid = ($orig_node->cnid ? $orig_node->cnid : $orig_node->nid);
+          if ($cnid == $orig_cnid) {
+            $dist_check = TRUE;
+          }
+          else {
+            switch ($func) {
+              case 'prev':
+              case 'get_parents':
+                if ($orig_node->navlinks_before && $node->navlinks_after) {
+                  $dist_check = TRUE;
+                }
+                break;
+              case 'next':
+                if ($orig_node->navlinks_after && $node->navlinks_before) {
+                  $dist_check = TRUE;
+                }
+                break;
+            }
+          }
+        }
+        if ($dist_check) {
+          $item = new stdClass();
+          $item->cid = $nid;
+          $item->title = $node->title;
+          return $item;
+        }
+      }
+      else {
+        $item = call_user_func('category_'. $func, $nid);
+        $item_nid = NULL;
+        switch ($func) {
+          case 'prev':
+          case 'next':
+            $item_nid = $item->cid;
+            break;
+          case 'get_parents':
+            $item_nid = isset($item[0]->cid) ? $item[0]->cid : FALSE;
+            break;
+          default:
+            return FALSE;
+        }
+
+        if ($item_nid) {
+          return _category_display_navlinks($item_nid, $func, $orig_node);
+        }
+      }
+    }
+  }
+
+  return FALSE;
+}

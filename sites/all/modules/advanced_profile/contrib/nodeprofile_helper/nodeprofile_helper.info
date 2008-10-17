@@ -1,0 +1,5 @@
+; $Id $
+name = Node Profile Helper
+description = "Functions for using Nodeprofile with Advanced Profile"
+dependencies = nodeprofile advanced_profile
+package = "Node Profile"

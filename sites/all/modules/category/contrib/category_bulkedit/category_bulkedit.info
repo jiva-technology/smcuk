@@ -1,0 +1,5 @@
+; $Id: category_bulkedit.info,v 1.1 2007/01/05 15:31:15 jaza Exp $
+name = Category bulk edit
+description = Provides an interface for editing multiple categories or containers at once.
+package = Category
+dependencies = category

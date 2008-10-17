@@ -1,0 +1,5 @@
+; $Id: cac_lite.info,v 1.1 2007/01/05 15:31:15 jaza Exp $
+name = Category access control lite
+description = Simple access control based on categories.
+package = Category
+dependencies = category

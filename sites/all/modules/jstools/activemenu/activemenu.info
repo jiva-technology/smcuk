@@ -1,0 +1,5 @@
+; $Id: activemenu.info,v 1.1.2.3 2007/08/08 21:26:08 nedjo Exp $
+name =  Activemenu
+description = Adds AJAX-based tree menu to navigation menu.
+package = Javascript tools
+dependencies = jstools

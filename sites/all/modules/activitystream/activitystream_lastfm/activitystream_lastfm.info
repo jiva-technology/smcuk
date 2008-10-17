@@ -1,0 +1,6 @@
+; $Id: activitystream_lastfm.info,v 1.1.2.1 2008/04/09 05:30:41 akalsey Exp $
+
+name = Last.fm
+description = What you're listening to
+dependencies = activitystream activitystream_feed
+package = Activity Stream

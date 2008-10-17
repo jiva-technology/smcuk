@@ -1,0 +1,5 @@
+name = Seesmic Comments
+description = "Enables Drupal comments with Seesmic videos (http://seesmic.com)"
+package = Seesmic
+version = 1.0
+dependencies = seesmic_api comment views

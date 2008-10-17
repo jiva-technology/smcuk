@@ -1,0 +1,41 @@
+/* $Id: userlink.css,v 1.2 2007/01/27 22:23:35 marcp Exp $ */
+/*
+ *   userlink.module customizations start here...
+ */
+ 
+.userlink-count {
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+.userlink-url {
+  display: inline;
+  padding-left: 5px;
+  font-size: 0.9em;
+  font-weight: bold;
+}
+
+div.userlink div.links {
+  border-top: 1px solid #f40;
+}
+
+fieldset.userlink-group legend {
+  font-size: 110%;
+  font-weight: bold;
+  font-style: italic;
+}
+
+/*
+ * Drop the tabs a little bit lower underneath the page title...
+ */
+div#main div.tabs {
+  padding-top: 10px;
+}
+
+.userlink-prefix {
+  display: inline;
+}
+
+/*
+ *   userlink.module customizations end here...
+ */

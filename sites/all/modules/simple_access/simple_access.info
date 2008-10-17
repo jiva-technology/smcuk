@@ -1,0 +1,4 @@
+; $Id: simple_access.info,v 1.4 2007/12/04 01:59:11 gordon Exp $
+name = Simple Access
+description = "Provides simple hide/view access for nodes."
+category = "access"

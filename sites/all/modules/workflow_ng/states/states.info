@@ -1,0 +1,4 @@
+; $Id: states.info,v 1.1.2.2 2007/12/29 19:50:26 fago Exp $
+name = State Machines
+description = Provides configurable state machines.
+package = Workflow-ng

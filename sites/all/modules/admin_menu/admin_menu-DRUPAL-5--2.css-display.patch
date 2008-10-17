@@ -1,0 +1,32 @@
+Index: admin_menu.css
+===================================================================
+RCS file: /cvs/drupal-contrib/contributions/modules/admin_menu/admin_menu.css,v
+retrieving revision 1.15.2.10
+diff -u -p -r1.15.2.10 admin_menu.css
+--- admin_menu.css	2 Mar 2008 22:10:35 -0000	1.15.2.10
++++ admin_menu.css	3 Apr 2008 20:33:22 -0000
+@@ -27,7 +27,7 @@ body.admin-menu { margin-top: 20px !impo
+ 
+ /* second-level lists */
+ /* using left instead of display to hide menus because display: none isn't read by screen readers */
+-#admin-menu li ul { position: absolute; background: none; margin: 0; width: 160px; left: -999em; line-height: 1.2em; }
++#admin-menu li ul { position: absolute; background: none; margin: 0; width: 160px; left: -999em; display: none; line-height: 1.2em; }
+ 
+ /* third-and-above-level lists */
+ #admin-menu li li.expandable ul { margin: -20px 0 0 160px; }
+@@ -41,6 +41,7 @@ body.admin-menu { margin-top: 20px !impo
+ #admin-menu li.sfhover ul ul ul ul,
+ #admin-menu li.sfhover ul ul ul ul ul {
+   left: -999em;
++  display: none;
+ }
+ 
+ /* lists nested under hovered list items */
+@@ -55,6 +56,7 @@ body.admin-menu { margin-top: 20px !impo
+ #admin-menu li li li li.sfhover ul,
+ #admin-menu li li li li li.sfhover ul {
+   left: auto;
++  display: block;
+ }
+ #admin-menu li.admin-menu-action:hover ul {
+   right: 0;

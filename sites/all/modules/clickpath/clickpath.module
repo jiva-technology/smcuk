@@ -1,0 +1,290 @@
+<?php
+// $Id: clickpath.module,v 1.1.2.1.2.2 2007/12/12 04:44:39 eaton Exp $
+
+/**
+*experimental add back port of D6 functionality
+**/
+
+include_once ("clickpath.inc");
+
+/**
+ * Implementation of hook_perm.
+ *
+ * Exposes permission to see one's own clickpath.
+ */
+function clickpath_perm() {
+  return array('view clickpath block');
+}
+
+
+
+function clickpath_menu() {
+  $items['admin/settings/clickpath'] = array(
+    'title' => 'Clickpath settings',
+    'description' => 'Configure what information will be displayed about the paths users take when clicking through the site.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('clickpath_admin_settings'),
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+function clickpath_admin_settings() {
+  $form = array();
+
+  $form['clickpath_count'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Number of paths to save'),
+    '#default_value' => variable_get('clickpath_count', 5),
+  );
+  
+  $form['clickpath_title_length'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Limit titles to a specific length'),
+    '#default_value' => variable_get('clickpath_title_length', 20),
+  );
+
+  $description = t("Enter one page per line as Drupal paths. The '*' character is a wildcard. Example paths are %blog for the blog page and %blog-wildcard for every personal blog. %front is the front page.", array('%blog' => 'blog', '%blog-wildcard' => 'blog/*', '%front' => '<front>'));
+  $form['clickpath_ignore_list'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Paths to ignore'),
+    '#default_value' => variable_get('clickpath_ignore_list', "admin*\nnode/*/*"),
+    '#description' => $description,
+  );
+
+  $form['clickpath_breadcrumb'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Override breacrumb trail'),
+    '#default_value' => variable_get('clickpath_breadcrumb', FALSE),
+    '#description' => t('Replace the standard Drupal breadcrumb trail with a list of the most recent pages a user has visited. If this option is used, ignoring paths is NOT recommended.'),
+  );
+  
+  $form['#validate'][] = 'clickpath_admin_settings_validate';
+
+  return system_settings_form($form);
+}
+
+function clickpath_admin_settings_validate($form, &$form_state) {
+  if (!is_numeric($form_state['values']['clickpath_count'])) {
+    form_set_error('clickpath_count', t('Number of paths to save must be a positive number.'));
+  }
+  if (!empty($form_state['values']['clickpath_title_length']) && !is_numeric($form_state['values']['clickpath_title_length'])) {
+    form_set_error('clickpath_title_length', t('Title length must be a positive number.'));
+  }
+}
+
+/**
+ * Implementation of hook_block.
+ * 
+ * Exposes a block containing the current user's most recently visited
+ * pages -- the path they've taken through the site.
+ */
+function clickpath_block($op = 'list', $delta = 0) {
+  global $user;
+  if ($op == 'list') {
+    $block[0]['info'] = t('Recently visited pages');
+    return $block;
+  }
+  else if ($op == 'view') {
+    if (user_access('view clickpath block') && $links = clickpath_get_paths()) {
+      $list = array();
+      $links = array_reverse($links, TRUE);
+      foreach ($links as $path => $title) {
+        $list[] = l(_clickpath_truncate_title($title), $path, array('html' => TRUE));
+      }
+
+      $block['subject'] = t('Recently visited pages');
+      $block['content'] = theme('item_list', $list);
+      return $block;
+    }
+  }
+}
+
+function clickpath_preprocess_page(&$variables) {
+  if (variable_get('clickpath_breadcrumb', FALSE)) {
+    $list = array();
+    $links = clickpath_get_paths();
+    foreach ($links as $path => $title) {
+      $list[] = l(_clickpath_truncate_title($title), $path, array('html' => TRUE));
+    }
+    drupal_set_breadcrumb($list);
+    $variables['breadcrumb'] = theme('breadcrumb', $list);
+  }
+}
+
+/**
+ * Implementation of hook_exit.
+ *
+ * Saves the path a user visited on page exit.
+ */
+function clickpath_exit() {
+  clickpath_save_path($_GET['q']);
+}
+
+function clickpath_get_paths() {
+  return empty($_SESSION['clickpath']) ? array() : $_SESSION['clickpath'];
+}
+
+function _clickpath_path_is_frontpage($path) {
+  return $path == drupal_get_normal_path(variable_get('site_frontpage', 'node'));
+}
+
+function _clickpath_truncate_title($title) {
+  $length = variable_get('clickpath_title_length', 20);
+  if ($length > 0 && strlen($title) > $length) {
+    $title = substr($title, 0, $length);
+  }
+  return $title;
+}
+
+function clickpath_save_path($path) {
+  $path_pattern = variable_get('clickpath_ignore_list', "admin*\nnode/*/*");
+
+  // Match path if necessary
+  if (!empty($path_pattern)) {
+    $aliased_path = drupal_get_path_alias($path);
+    // Compare with the internal and path alias (if any).
+    $page_match = drupal_match_path($aliased_path, $path_pattern);
+    if ($aliased_path != $_GET['q']) {
+      $page_match = $page_match || drupal_match_path($path, $path_pattern);
+    }
+    
+    // Since it's a list of patterns to ignore, flip it.
+    $page_match = !$page_match;
+  }
+  else {
+    $page_match = TRUE;
+  }
+  
+  if ($page_match) {
+    $title = _clickpath_path_is_frontpage($path) ? t('Home') : drupal_get_title();
+    $clickpath = clickpath_get_paths();
+    if (empty($clickpath[$path])) {
+      $clickpath[$path] = $title;
+      while (count($clickpath) > variable_get('clickpath_count', 5)) {
+        array_shift($clickpath);
+      }
+    }
+    else {
+      unset($clickpath[$path]);
+      $clickpath[$path] = $title;
+    }
+    $_SESSION['clickpath'] = $clickpath;
+  }
+}
+
+
+/**
+* Implementation of hook_views_default_views()
+**/
+
+//custom view creates a page from clickpath data and turns it into a sortable page
+function clickpath_views_default_views() {
+
+  $view = new stdClass();
+  $view->name = 'clickpath_list';
+  $view->description = 'Used to create future functionality list for "post and go" content-hopping after comments. ***THIS DOES NOT WORK YET! DO NOT USE THIS!!!!***';
+  $view->access = array (
+  0 => '2',
+);
+  $view->view_args_php = '';
+  $view->page = TRUE;
+  $view->page_title = 'Clickpath List';
+  $view->page_header = '';
+  $view->page_header_format = '1';
+  $view->page_footer = '';
+  $view->page_footer_format = '1';
+  $view->page_empty = '';
+  $view->page_empty_format = '1';
+  $view->page_type = 'table';
+  $view->url = 'clickpathlist';
+  $view->use_pager = TRUE;
+  $view->nodes_per_page = '30';
+  $view->menu = TRUE;
+  $view->menu_title = '';
+  $view->menu_tab = FALSE;
+  $view->menu_tab_weight = '0';
+  $view->menu_tab_default = FALSE;
+  $view->menu_tab_default_parent = NULL;
+  $view->menu_tab_default_parent_type = 'tab';
+  $view->menu_parent_tab_weight = '0';
+  $view->menu_parent_title = '';
+  $view->sort = array (
+    array (
+      'tablename' => 'node',
+      'field' => 'changed',
+      'sortorder' => 'DESC',
+      'options' => 'day',
+    ),
+  );
+  $view->argument = array ( 
+  );
+  $view->field = array (
+    array (
+      'tablename' => 'node',
+      'field' => 'title',
+      'label' => '',
+      'handler' => 'views_handler_field_nodelink',
+      'options' => 'link',
+    ),
+    array (
+      'tablename' => 'term_node_1',
+      'field' => 'name',
+      'label' => 'From Forum:',
+      'options' => 'link',
+    ),
+  );
+  $view->filter = array (
+    array (
+      'tablename' => 'node',
+      'field' => 'status',
+      'operator' => '=',
+      'options' => '',
+      'value' => '1',
+    ),
+    array (
+      'tablename' => 'node',
+      'field' => 'type',
+      'operator' => 'OR',
+      'options' => '',
+      'value' => array (
+  0 => 'forum',
+),
+    ),
+  );
+  $view->exposed_filter = array (
+    array (
+      'tablename' => 'node',
+      'field' => 'type',
+      'label' => 'Content Type',
+      'optional' => '0',
+      'is_default' => '0',
+      'operator' => '0',
+      'single' => '0',
+    ),
+  );
+  $view->requires = array(node, term_node_1);
+  $views[$view->name] = $view;
+  return $views;
+
+}
+
+
+/**
+*experimental new stuff
+**/
+
+
+function clickpath_list_menu($may_cache) {
+  if ($may_cache) {
+    $items[] = array('path' => 'clickpath',
+      'title' => t('Clickpath List'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => 'clickpath_list_page',
+      'access' => user_access('access clickpath list'),
+      'description' => t('Clickpath list.'),
+    );
+  }
+}

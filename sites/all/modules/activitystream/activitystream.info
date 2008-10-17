@@ -1,0 +1,6 @@
+; $Id: activitystream.info,v 1.1.2.1 2008/04/09 05:30:40 akalsey Exp $
+
+name = Activity Stream Core
+description = Core API module for Activity Streams
+package = Activity Stream
+dependencies = profile

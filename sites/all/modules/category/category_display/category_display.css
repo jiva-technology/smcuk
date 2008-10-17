@@ -1,0 +1,31 @@
+/* $Id: category_display.css,v 1.5 2006/05/07 12:46:35 jaza Exp $ */
+
+.category-navigation .menu {
+  border-top: 1px solid #888;
+  padding: 1em 0 0 3em;
+}
+.category-navigation .page-links {
+  border-top: 1px solid #888;
+  border-bottom: 1px solid #888;
+  text-align: center;
+  padding: 0.5em;
+  margin-bottom: 1em;
+}
+.category-navigation .page-previous {
+  text-align: right;
+  margin: 0 2em 0 0;
+}
+.category-navigation .page-up {
+  margin: 0 2em;
+}
+.category-navigation .page-next {
+  text-align: left;
+  margin: 0 0 0 2em;
+}
+.category-toc-node-count {
+  font-style: italic;
+}
+.expanded ul.menu {
+  border: 0;
+  padding-top: 0;
+}

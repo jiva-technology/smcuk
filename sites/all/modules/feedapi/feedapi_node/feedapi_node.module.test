@@ -1,0 +1,169 @@
+<?php
+// $Id: feedapi_node.module.test,v 1.1.2.7 2008/04/04 20:10:06 aronnovak Exp $
+
+/**
+ * Class for testing feedapi_node.
+ * It also tests FeedAPI and SimplePie parsers.
+ */
+class FeedAPI_Node_Tests extends DrupalTestCase {
+  
+  function get_info() {
+    return array('name' => 'FeedAPI Node basic functions', 'desc' => "Refresh a feed and find out if it's okay. Uses SimplePie parser for parsing and downloading." , 'group' => 'FeedAPI');
+  }
+
+  /**
+   * Add a content-type, create a feed and refresh it.
+   * Check if everything seems ok
+   * Delete the feed
+   * Check if the rubbish is purged as well.
+   */
+  function testFeedAPI_Node_Refresh_Feed() {
+    
+    // Create a new content-type for creating the feed node
+    $info->type = 'feedapi_node_'. $this->randomName();
+    $info->name = 'Feed'. str_replace('_', ' ', $this->randomName());
+    $info->description = t('Aggregates RSS or Atom feeds. Items from these feeds will be turned into nodes.');
+    $info->module = 'node';
+    $info->has_title = TRUE;
+    $info->title_label = t('Title');
+    $info->has_body = TRUE;
+    $info->body_label = t('Body');
+    $info->min_word_count = 0;
+    $info->custom = TRUE;
+    node_type_save($info);
+    
+    // Adding default FeedAPI settings
+    variable_set('feedapi_settings_'. $info->type, unserialize('a:3:{s:7:"enabled";s:1:"1";s:7:"parsers";a:2:{s:16:"parser_simplepie";a:3:{s:7:"enabled";s:1:"1";s:6:"weight";s:1:"0";s:4:"test";s:1:"3";}s:25:"parser_common_syndication";a:3:{s:7:"enabled";s:1:"0";s:6:"weight";s:2:"-2";s:6:"tester";s:1:"3";}}s:10:"processors";a:2:{s:12:"feedapi_node";a:5:{s:6:"weight";s:1:"0";s:12:"content_type";s:5:"story";s:9:"node_date";s:4:"feed";s:7:"promote";s:1:"3";s:7:"enabled";s:1:"1";}s:18:"feedapi_aggregator";a:2:{s:6:"weight";s:1:"0";s:5:"block";s:1:"3";}}}'));
+    
+    // Login with a user who has FeedAPI rights
+    $user = $this->drupalCreateUserRolePerm(array('administer feedapi', 'advanced feedapi options', 'administer nodes', "create $info->type content"));
+    $this->drupalLoginUser($user);
+    
+    // Create the feed node
+    // Make the URL unique. It's not impossible that someone add this feed URL to the DB prior.
+    $feed_url = "http://novaak.net/test_feed.rss?". $this->randomName();
+    $edit = array(
+        'feedapi[feedapi_url]' => $feed_url,
+    );
+    $this->drupalPostRequest('node/add/'. $info->type, $edit, 'Submit');
+    $this->assertText(t('Link to site'), 'The node is created.');
+    
+    // Check if the entry is in the DB
+    $nid = db_result(db_query("SELECT nid FROM {feedapi} WHERE url = '%s'", $feed_url));
+    $this->assertEqual(is_numeric($nid), TRUE, 'The feed node is in the database');
+    $feed_node = node_load(array('nid' => $nid));
+    $this->assertEqual(is_object($feed_node->feed), TRUE, 'The feed can be loaded.');
+    
+    // Disable feed item expiring
+    $settings = feedapi_get_settings($info->type, $nid);
+    $settings['items_delete'] = FEEDAPI_NEVER_DELETE_OLD;
+    _feedapi_store_settings(array('nid' => $nid), $settings);
+    
+    // Refresh the feed
+    $this->drupalGet(url("node/$nid/refresh", NULL, NULL, TRUE));
+    $this->assertText("10 new item(s) were saved. 0 existing item(s) were updated", 'The proper number of items were created');
+    
+    
+    // Check the feed items
+    $result = db_query("SELECT fi.nid FROM {feedapi_node_item} fi JOIN {feedapi_node_item_feed} ff ON ff.feed_item_nid = fi.nid WHERE ff.feed_nid = %d", $nid);
+    $types = array();
+    $author_check = TRUE;
+    $item_nids = array();
+    while ($node = db_fetch_array($result)) {
+      $item_nids[] = $node['nid'];
+      $node = node_load(array('nid' => $node['nid']));
+      $types[] = $node->type;
+      // Check the length of the nodes
+      $title_size[] = strlen($node->title);
+      $body_size[] = strlen($node->body);
+      // Check the author of the nodes
+      $author_check = ($feed_node->uid == $node->uid) && $author_check;
+    }
+    $types = array_unique($types);
+    $this->assertEqual($types[0], 'story', 'The first news item is a story.');
+    $this->assertEqual(count($types), 1, 'All news items have the same type.');
+    sort($title_size);
+    sort($body_size);
+    $this->assertNotEqual($title_size[0], 0, 'All news item titles are longer than 0 character.');
+    $this->assertNotEqual($body_size[0], 0, 'All news item bodies are longer than 0 character.');
+    $this->assertTrue($author_check, 'All news items has the proper author.');
+    
+    // Temporary solution. Now purging is commented out in feedapi.module because of possible timeouts
+    feedapi_invoke_feedapi('purge', $feed_node->feed);
+    // Remove the unwanted rubbish
+    node_delete($nid);
+    
+    // Check if the news items are deleted as well
+    $item_remain = db_result(db_query("SELECT COUNT(*) FROM {feedapi_node_item} fi JOIN {feedapi_node_item_feed} ff ON ff.feed_item_nid = fi.nid WHERE ff.feed_nid = %d", $nid));
+    $this->assertEqual($item_remain, 0, 'All news item database entries are deleted because of feed deletion.');
+    
+    // Check if the nodes belong to the news items are really deleted
+    $node_remain = db_result(db_query("SELECT COUNT(*) FROM {node} WHERE nid IN (%s)", implode(',', $item_nids)));
+    $this->assertEqual($node_remain, 0, 'All nodes belonging to a news item are deleted.');
+    
+    // Reset node types so we get all blocks
+    node_get_types('types', NULL, TRUE);
+
+    // Generate blocks to get a simplified feed adding block for the new content-type
+    $this->drupalGet(url("admin/build/block"));
+    _block_rehash();
+    // Disable all blocks, but remember enabled ones
+    $result = db_query("SELECT module, delta FROM {blocks} WHERE status = 1");
+    $to_disable_blocks = array();
+    while ($row = db_fetch_array($result)) {
+      $to_disable_blocks[] = $row;
+    }
+    db_query("UPDATE {blocks} SET status = 0 WHERE status = 1");
+    // Enable simplified form block
+    
+    $region = array_pop(array_keys(system_region_list(variable_get('theme_default', FALSE)))); // First region which is ok for the current theme
+    db_query("UPDATE {blocks} SET status = 1, region='%s' WHERE module = 'feedapi' AND delta = '%s'", $region, $info->type);
+    
+    // Check for existing block showing up
+    $this->drupalGet(url('node'));    
+    $this->assertText(t('Feed URL'), 'The block is showing up');
+    
+    // Submit feed via simplified block
+    $feed_url = "http://novaak.net/test_feed.rss?". $this->randomName();
+    $edit = array(
+      'url' => $feed_url,
+    );
+    $this->drupalPostRequest('node', $edit, 'Add');
+    $this->assertText(t('Link to site'), 'The node is created via the simplified form block.');
+    
+    // Check if the entry is in the DB
+    $nid = db_result(db_query("SELECT nid FROM {feedapi} WHERE url = '%s'", $feed_url));
+    $this->assertEqual(is_numeric($nid), TRUE, 'The feed node is in the database');
+    
+    if (is_numeric($nid)) {
+      $values = db_fetch_array(db_query("SELECT settings, feed_type, checked, half_done FROM {feedapi} WHERE nid = %d", $nid));
+      $sane_default = TRUE;
+      $sane_default = $sane_default || (is_array($values['settings']) && count($values['settings']) > 1);
+      $sane_default = $sane_default || ($values['feed_type'] == 'XML feed');
+      $sane_default = $sane_default || ($values['checked'] == 0);
+      $sane_default = $sane_default || ($values['half_done'] == 0);
+      $this->assertIdentical($sane_default, TRUE, "The feed has sane default values in the database table");
+      node_delete($nid);
+    }
+    
+    // Restore blocks to the user's previous settings
+    db_query("UPDATE {blocks} SET status = 0 WHERE module = 'feedapi' AND delta = '%s'", $info->type);
+    foreach ($to_disable_blocks as $to_enable_block) {
+      db_query("UPDATE {blocks} SET status = 1 WHERE module = '%s' AND delta ='%s'", $to_enable_block['module'], $to_enable_block['delta']);
+    }
+    node_types_rebuild();
+    // Remove temporary content-type
+    node_type_delete($info->type);
+    
+    // Check if the type deletion occurs variable deletion
+    $this->assertIdentical(FALSE, variable_get('feedapi_settings_'. $info->type, FALSE), 'The content-type\'s setting variable is successfully deleted.');
+    
+    // Make sure that the variables are loaded from the DB
+    variable_init();
+    
+    // Restore blocks - according to the deleted content-type
+    _block_rehash();
+    $this->drupalGet(url("admin/build/block"));
+
+  }
+}

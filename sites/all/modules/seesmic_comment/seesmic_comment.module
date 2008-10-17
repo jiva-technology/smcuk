@@ -1,0 +1,288 @@
+<?php
+// $Id
+/**
+ * @file
+ * Enabling Drupal comments with seesmic video
+ *
+ * @author Aleksey Tkachenko & Sergey Bozhko (eDrupal.fr)
+ */
+
+
+/**
+ * Invoke a hook_seesmic_comment() operation in all modules.
+ *
+ * @param &$comment
+ *   A comment array.
+ * @param $op
+ *   A string containing the name of the comment operation.
+ * @return
+ *   The returned value of the invoked hooks.
+ */
+
+function seesmic_comment_invoke_seesmic_comment(&$comment, $op) {
+  $return = array();
+  foreach (module_implements('seesmic_comment') as $name) {
+    $function = $name .'_seesmic_comment';
+    $result = $function($comment, $op);
+    if (isset($result) && is_array($result)) {
+      $return = array_merge($return, $result);
+    }
+    else if (isset($result)) {
+      $return[] = $result;
+    }
+  }
+  return $return;
+}
+
+/**
+ * Implementation of hook_menu
+ *
+ * @param bool $may_cache
+ * @return array
+ */
+function seesmic_comment_menu($may_cache) {
+  $items = array();
+  if ($may_cache) {
+    $items[] = array(
+      'path'               => 'admin/settings/seesmic/comments',
+      'title'              => t('Seesmic comments settings'),
+      'description'        => t('Change seesmic comments settings'),
+      'callback'           => 'drupal_get_form',
+      'callback arguments' => array('seesmic_comment_admin_settings'),
+      'access'             => user_access('administer site configuration')
+    );
+  }
+  return $items;
+}
+
+/**
+ * Settings form for Seesmic Comments
+ *
+ * @return array
+ */
+function seesmic_comment_admin_settings() {
+  $form['seesmic_comment_enabled'] = array(
+    '#type'          => 'checkbox',
+    '#title'         => t('Enable Seesmic Comments'),
+    '#default_value' => variable_get('seesmic_comment_enabled', 0)
+  );
+
+  $form['#validate'] = array(
+    'seesmic_comment_admin_settings_validate' => array()
+  );
+  return system_settings_form($form);
+}
+
+/**
+ * Implementation of hook_perm
+ */
+function seesmic_comment_perm() {
+  return array('access seesmic comments', 'post seesmic comments', 'administer seesmic comments', 'post seesmic comments without approval');
+}
+
+/**
+ * Implementation of hook_comment
+ */
+function seesmic_comment_comment(&$a1, $op) {
+  global $base_path;
+  if (!variable_get('seesmic_comment_enabled', 0)) // Checking if seesmic_comment are enabled
+    return;
+  switch ($op) {
+    case 'form':
+      // hooking into comment form
+      if (!user_access('post seesmic comments'))
+        return;
+      $form['op'] = array(
+	    '#type' => 'hidden',
+		'#value' => t('Post comment')
+	  );
+      $form['form_id'] = array(
+	    '#type' => 'hidden',
+		'#value' => 'comment_form'
+	  );
+
+      $form['recorder'] = array(
+        '#type' => 'markup',
+        '#value' => '<div id="recorder" style="display: none">'. seesmic_api_show_recorder($a1['nid']['#value']) .'</div>'
+      );
+      $form['seesmic'] = array(
+        '#type' => 'markup',
+        '#value' => '<div id="toggle" style="display: none;"><a href="#" onclick="
+		  $(\'#recorder\').hide();
+		  $(\'#toggler\').show();
+		  $(\'.collapsible\').show();
+		  $(\'.resizable-textarea\').show();
+		  $(\'#edit-comment\').show();
+		  $(\'#toggle\').hide();
+		  ">'. t("Add a text comment") .'</a>
+ </div><img onclick="
+		  $(\'#recorder\').show(); 
+		  $(\'#edit-comment\').hide(); 
+		  $(\'.resizable-textarea\').hide(); 
+		  $(\'.collapsible\').hide(); 
+		  $(\'#toggler\').hide(); 
+		  $(\'#toggle\').show();" src="'. base_path() . drupal_get_path('module', 'seesmic_comment') .'/seesmic.png" title="'. t("Add a video comment") .'" style="cursor:pointer; cursor:hand; border:none;" id="toggler"/><br />',
+      );
+      $form['dsvid'] = array(
+        '#type' => 'textfield',
+        '#prefix' => '<div style="display: none">', // Cannot use hidden value here, because of Drupal FAPI.
+        '#suffix' => '</div>',
+      );
+	  $form['thumb_url'] = array(
+        '#type' => 'textfield',
+        '#prefix' => '<div style="display: none">', // Cannot use hidden value here, because of Drupal FAPI.
+        '#suffix' => '</div>',
+      );
+      return $form;
+    case 'update':
+    case 'insert':
+	  if (!$a1['dsvid'])
+	    return;
+      db_query('DELETE FROM {seesmic_comments} WHERE cid = %d', $a1['cid']); // Deleting previous video from comment
+      $scid = db_next_id('{seesmic_comments}_scid');
+	  $status = user_access('post seesmic comments without approval'); // Check user status
+      $sql = 'INSERT INTO {seesmic_comments} (scid, cid, seesmic_video_id, status) VALUES (%d, %d, \'%s\', %d)';
+      $result = db_query($sql, $scid, $a1['cid'], $a1['dsvid'], $status); // Adding new video to comment
+      break;
+    case 'delete':
+      // syncing with comments removal
+      $sql = 'DELETE FROM {seesmic_comments} WHERE cid = %d';
+      $result = db_query($sql, $a1->cid);
+      break;
+    case 'view':
+      $dsvid = seesmic_comment_get_video_id($a1->cid);
+      if ($dsvid) {
+        // hooking into comment displaying and checking if an user have access to see seesmic comment and if this comment is approved by admin
+        if (!user_access('access seesmic comments') || !seesmic_comment_approved($a1->cid))
+          return;
+        $a1->comment = seesmic_api_show_thumb_player($dsvid); 
+      }
+      break;
+
+  }
+}
+
+/*
+ * Check the status of seesmic comment (Approved or not)
+ */
+function seesmic_comment_approved($cid) {
+  global $user;
+  if ($user->uid == 1)
+    return 1;
+  else
+    return db_result(db_query('SELECT scid FROM {seesmic_comments} WHERE cid = %d AND status = 1', $cid));
+}
+
+/*
+ * Get seesmic video id for comment id, if exists
+ */
+function seesmic_comment_get_video_id($cid) {
+  $sql = 'SELECT dsvid FROM {seesmic_videos} sv INNER JOIN {seesmic_comments} sc ON sv.seesmic_video_id = sc.seesmic_video_id WHERE sc.cid = %d';
+  $result = db_query($sql, $cid);
+  if (db_num_rows($result)) {
+    return db_result($result);
+  }
+  else {
+    return 0;
+  }
+}
+
+/**
+ * Function to insert values into array at specific position
+ */
+function seesmic_comment_array_insert(&$array, $insert, $position) {
+  @array_splice($array, $position, 0, $insert);
+}
+
+/**
+ * Implementation of hook_comment
+ */
+function seesmic_comment_form_alter($form_id, &$form) {
+  if ($form_id != 'comment_admin_overview')
+    return;
+  $options = array('comments' => t('Text comments'), 'both' => t('Both'), 'seesmic' => t('Seesmic comments'));
+  $form['options']['filter'] = array('#type' => 'select', '#options' => $options, '#default_value' => ($_GET['filter']));
+  $form['options']['filter_submit'] = array('#type' => 'submit', '#value' => t('Filter'));
+  //$result = db_query('SELECT cid, seesmic_video_id FROM {seesmic_comments} WHERE 1');
+  if ($_GET['filter'] == 'seesmic' || $_GET['filter'] == 'both' || !isset($_GET['filter'])) {
+    seesmic_comment_array_insert($form['header']['#value'], array('data' => t('Seesmic Video')), 1);
+  }
+  
+  $sql = 'SELECT c.subject, c.nid, c.cid, c.comment, c.timestamp, c.status, c.name, c.homepage, u.name AS registered_name, u.uid FROM {comments} c INNER JOIN {users} u ON u.uid = c.uid';
+  if ($_GET['filter'] == 'seesmic') {
+   $sql .= ' INNER JOIN {seesmic_comments} sc ON sc.cid = c.cid';
+  }
+  $sql .= ' WHERE c.status = %d '.tablesort_sql($form['header']['#value']);
+  $result = pager_query($sql, 50, 0, NULL, arg(4) ? 1 : 0);
+  $destination = drupal_get_destination();
+  unset($form['subject']); unset($form['username']);
+  unset($form['timestamp']); unset($form['operations']);
+  while ($comment = db_fetch_object($result)) {
+ 	$video_id = seesmic_comment_get_video_id($comment->cid);
+    if ($_GET['filter'] == 'comments' && $video_id) {
+      continue;  
+	}
+    $comments[$comment->cid] = '';
+    $comment->name = $comment->uid ? $comment->registered_name : $comment->name;
+    $form['subject'][$comment->cid] = array('#value' => l($comment->subject, 'node/'. $comment->nid, array('title' => truncate_utf8($comment->comment, 128)), NULL, 'comment-'. $comment->cid));
+    $form['username'][$comment->cid] = array('#value' => theme('username', $comment));
+    $form['timestamp'][$comment->cid] = array('#value' => format_date($comment->timestamp, 'small'));
+    $form['operations'][$comment->cid] = array('#value' => l(t('edit'), 'comment/edit/'. $comment->cid, array(), $destination));
+	if ($_GET['filter'] != 'comments' && $video_id)
+      $form['seesmic'][$comment->cid] = array('#value' =>seesmic_api_show_thumb_player($video_id));
+	elseif ($_GET['filter'] == 'both' || !$_GET['filter'])
+	  $form['seesmic'][$comment->cid] = array('#value' => t('(No seesmic video attached)'));
+  }
+  $form['comments'] = array('#type' => 'checkboxes', '#options' => $comments);
+  
+  $form['#theme'] = 'seesmic_comment_overview';
+  $form['#validate'] = array('seesmic_comment_overview_validate' => array());
+  $form['#submit'] = array('seesmic_comment_overview_submit' => array());
+}
+
+function theme_seesmic_comment_overview($form) {
+  $output = drupal_render($form['options']);
+  if (isset($form['subject']) && is_array($form['subject'])) {
+    foreach (element_children($form['subject']) as $key) {
+      $row = array();
+      $row[] = drupal_render($form['comments'][$key]);
+	  if ($_GET['filter'] != 'comments') {
+	    $row[] = drupal_render($form['seesmic'][$key]);
+	  }
+      $row[] = drupal_render($form['subject'][$key]);
+      $row[] = drupal_render($form['username'][$key]);
+      $row[] = drupal_render($form['timestamp'][$key]);
+      $row[] = drupal_render($form['operations'][$key]);
+      $rows[] = $row;
+    }
+  }
+  else {
+    $rows[] = array(array('data' => t('No comments available.'), 'colspan' => '6'));
+  }
+
+  $output .= theme('table', $form['header']['#value'], $rows);
+  if ($form['pager']['#value']) {
+    $output .= drupal_render($form['pager']);
+  }
+
+  $output .= drupal_render($form);
+
+  return $output;
+}
+
+function seesmic_comment_overview_validate($form_id, $form_values) {
+  if ($form_values['op'] == 'Update')
+    return comment_admin_overview_validate($form_id, $form_values);
+}
+
+function seesmic_comment_overview_submit($form_id, $form_values) {
+  if ($form_values['op'] == 'Update')
+    return comment_admin_overview_submit($form_id, $form_values);
+  else {
+    if (arg(4))   
+	  drupal_goto('admin/content/comment/list/approval', 'filter='.$form_values['filter']);
+	else
+      drupal_goto('admin/content/comment', 'filter='.$form_values['filter']);
+  }
+  
+}

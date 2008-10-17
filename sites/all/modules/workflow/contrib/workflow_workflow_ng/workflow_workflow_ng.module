@@ -1,0 +1,204 @@
+<?php 
+function workflow_workflow_ng_event_info() {
+  
+  $events = array(
+    'workflow_transition_post' => array(
+      '#label' => t('Workflow has been updated'),
+      '#module' => t('Workflow'),
+      '#arguments' =>  workflow_workflow_ng_events_workflow_arguments(),
+    ),
+  );
+  return $events;
+}
+
+/*
+ * Returns some arguments suitable for using it with a node
+ */
+function workflow_workflow_ng_events_workflow_arguments() {
+  return array(
+    'node' => array('#entity' => 'node', '#label' => t('Node')),
+    'state' => array('#entity' => 'workflow', '#label' => t('Workflow State'), '#handler' => 'workflow_ng_events_argument_workflow_state'),
+    'author' => array('#entity' => 'user', '#label' => t('Author'), '#handler' => 'workflow_ng_events_argument_node_author'),
+    'user' => array('#entity' => 'user', '#label' => t('acting user'), '#handler' => 'workflow_ng_events_argument_global_user'),
+  );
+}
+
+function workflow_ng_events_argument_workflow_state($node){    
+  return $node;  
+}
+
+
+function workflow_workflow_ng_workflow($op, $old_state, $new_state, $node) {  
+  if(!module_exists('workflow_ng')) {
+    return;
+  }
+  if (in_array($op, array('transition pre', 'transition post'))) {    
+    $op = str_replace(" ","_",$op);
+    workflow_ng_invoke_event('workflow_'. $op, $node);
+  }  
+}
+
+
+
+
+/*
+ * Implementation of hook_condition_info()
+ */
+function workflow_workflow_ng_condition_info() {
+  return array(
+    'workflow_ng_condition_workflow_transition_is' => array(
+      '#label' => t('Workflow Transition is'),
+      '#arguments' => array(
+        'workflow' => array('#entity' => 'node', '#label' => t('Workflow')),      ),
+      '#description' => t('Evaluates to TRUE, if the workflow being updated is moved from state a to state b'),
+      '#module' => t('Workflow'),
+    ),
+  );
+}
+
+
+
+/*
+ * Condition: Check for selected content types
+ */
+function workflow_ng_condition_workflow_transition_is($node, $settings) {
+  //get node workflow, check against settings
+  workflow_node_current_state($node);
+  $from_state = $settings['from_state'];
+  $to_state = $settings['to_state'];
+  $result = db_query_range("SELECT h.* FROM {workflow_node_history} h WHERE nid = %d ORDER BY stamp DESC",$node->nid,0,1);      
+  if ($row = db_fetch_object($result)) {
+    if (  ( in_array($row->old_sid,$from_state) || isset($from_state['ALL']) ) &&
+       ( in_array($row->sid,$to_state) || isset($to_state['ALL']) )  ) {
+       return true;
+     }
+  }
+  
+  return false;
+}
+
+/*
+ *  Check for content types - Configuration form
+ */
+function workflow_ng_condition_workflow_transition_is_form($settings = array()) {
+  
+  $options = array();
+  $options['ANY'] = 'Any State';
+  foreach(workflow_get_all() as $wid => $workflow) {    
+    foreach (workflow_get_states($wid) as $sid => $state) {
+      $options[$sid] = $workflow .': '.$state;
+    }
+  }
+  
+  $form['from_state'] = array(
+    '#type' => 'select',
+    '#title' => t('From State'),
+    '#options' => $options,
+    '#multiple' => TRUE,
+    '#default_value' => isset($settings['from_state']) ? $settings['from_state'] : array(),
+    '#required' => TRUE,
+  );
+  
+  $form['to_state'] = array(
+    '#type' => 'select',
+    '#title' => t('To State'),
+    '#options' => $options,
+    '#multiple' => TRUE,
+    '#default_value' => isset($settings['to_state']) ? $settings['to_state'] : array(),
+    '#required' => TRUE,
+  );
+  
+  return $form;
+}
+
+function workflow_ng_condition_workflow_transition_is_submit($form_id, $form_values) {
+  
+  return array(
+    'from_state' => $form_values['from_state'],
+    'to_state' => $form_values['to_state']
+  );
+}
+
+
+
+function workflow_workflow_ng_configuration() {
+  
+  $conf['email_author_when_state_changes'] = 
+  array (
+    '#type' => 'configuration',
+    '#altered' => false,
+    '#event' => 'workflow_transition_post',
+    '#label' => 'Email Author when workflow state changes',
+    '#active' => 0,
+    '#module' => 'workflow-ng',
+    0 => 
+    array (
+      '#type' => 'condition',
+      '#name' => 'workflow_ng_condition_token_compare',
+      '#negate' => 1,
+      '#settings' => 
+      array (
+        'text1' => '[state:workflow-current-state-name]',
+        'text1_args' => 
+        array (
+          0 => 'state',
+        ),
+        'text2' => '[state:workflow-old-state-name]',
+        'text2_args' => 
+        array (
+          0 => 'state',
+        ),
+        'regex' => 0,
+      ),
+      '#label' => 'Current State Name == Old state Name',
+    ),
+    1 => 
+    array (
+      '#type' => 'action',
+      '#name' => 'workflow_ng_action_mail_to_user',
+      '#argument map' => 
+      array (
+        'author' => 'user',
+      ),
+      '#settings' => 
+      array (
+        'from' => '[node:site-mail]',
+        'from_args' => 
+        array (
+          0 => 'node',
+        ),
+        'subject' => 'State of [node:title] Changed',
+        'subject_args' => 
+        array (
+          0 => 'node',
+        ),
+        'message' => 'It is now [state:workflow-current-state-name]',
+        'message_args' => 
+        array (
+          0 => 'state',
+        ),
+      ),
+      '#label' => 'Send Notification to Author',
+    ),
+   2 => 
+      array (
+        '#type' => 'action',
+        '#name' => 'workflow_ng_action_drupal_message',
+        '#settings' => 
+        array (
+          'message' => 'Mail has been sent to the author, notifying them of their ownership of [node:title]',
+          'message_args' => 
+          array (
+            0 => 'node',
+            1 => 'state',
+          ),
+          'error' => 0,
+        ),
+      ),
+    '#name' => 'cfg_2',
+  )
+  ;
+  
+return $conf;
+}
+?>

@@ -1,0 +1,397 @@
+<?php
+// $Id
+/**
+ * @file
+ * Enabling Drupal with Seesmic API
+ *
+ * @author Sergey Bozhko & Maxime Topolov (www.adyax.com)
+ */
+define('SEESMIC_JS_URL', 'http://api.seesmic.com/js/pkg/seesmic_standalone.js');
+//define('SEESMIC_JS_URL', 'http://localhost/drupal/seesmic_standalone.js');
+/**
+ * Implementation of the Seesmic API
+ */
+require_once 'seesmicapi.class.php';
+
+// Minimum PHP version that Seesmic API work with
+define('SEESMIC_API_MINIMUM_PHP', '5.0');
+
+/**
+ * Implementation of hook_menu
+ *
+ * @param bool $may_cache
+ * @return array
+ */
+function seesmic_api_menu($may_cache) {
+  $items = array();
+  if ($may_cache) {
+    // Callback for processing API calls
+    $items[] = array(
+      'path'      => 'seesmic/request',
+      'access'    => true,
+      'callback'  => 'seesmic_api_process_request'
+    );
+    //Callback for recorder
+    $items[] = array(
+      'path'      => 'seesmic/recorder',
+      'access'    => true,
+      'callback'  => 'seesmic_api_show_recorder'
+    );
+    //Callback for player
+    $items[] = array(
+      'path'      => 'seesmic/player',
+      'access'    => true,
+      'callback'  => 'seesmic_api_show_player',
+    );
+    $items[] = array(
+      'path'      => 'seesmic/rawplayer',
+      'access'    => true,
+      'callback'  => 'seesmic_api_show_rawplayer',
+	  'type' => MENU_CALLBACK
+    );
+
+    //Callback for posting video
+    $items[] = array(
+      'path'      => 'seesmic/post',
+      'access'    => true,
+      'callback'  => 'seesmic_api_post_video'
+    );
+  }
+  return $items;
+}
+
+/**
+ * Posting video to drupal database
+ *
+ */
+function seesmic_api_post_video($video_id) {
+  $thumb_url = $_GET['thumb_url'];
+  
+  global $user;
+  if ($video_id) {
+    // Adding video to database
+    $created  = mktime();
+    $dsvid    = db_next_id('{seesmic_videos}_dsvid');
+	$sql = 'INSERT INTO {seesmic_videos} (dsvid, seesmic_video_id, uid, created, thumb_url) VALUES (%d, \'%s\', %d, %d, \'%s\')';
+    $result = db_query($sql, $dsvid, $video_id, $user->uid, $created, $thumb_url);
+    $edit = array(
+      'seesmic_video_id' => $video_id,
+      'uid'             => $user->uid,
+      'created'         => $created,
+      'dsvid'           => $dsvid,
+      'thumb_url'       => $thumb_url
+    );
+    watchdog('seesmic', $video_id .' - '. $thumb_url.' - '.$dsvid. ' - '.db_affected_rows());
+    // Tell the other modules a new video has been submitted.
+    seesmic_api_invoke_seesmic_api($edit, 'insert');
+  }
+  return;
+}
+
+/**
+ * Process the request and returns an object with results
+ * @return object
+ */
+function seesmic_api_process_request($operation) {
+  $arguments = array();
+  $i = 3;
+  // Get arguments list
+  while ($arg = arg($i++)) $arguments[] = $arg;
+  // Creating Seesmic API class instance
+  $oSeesmic = new SeesmicAPI($operation);
+  // Defining default result
+  $result   = new stdClass();
+  // Rining the query
+  if ($oSeesmic->process($arguments)) {
+    // If we got good results, storing them
+    $result = $oSeesmic->getResult();
+  }
+  else {
+    // Showing an error message otherwise
+    drupal_set_message($oSeesmic->getError(), 'error');
+  }
+  // Temporary output
+  return print_r($result, true);
+}
+
+/**
+ * Shows player for given video_id
+ *
+ * @param int $dsvid
+ *  Drupal seesmic video ID
+ */
+function seesmic_api_show_player($dsvid, $closeable = FALSE, $autoplay = TRUE) {
+  if ($dsvid) {
+    // Getting seesmic video ID based on Drupal Seesmic video ID
+    $seesmic_video_id = db_result(db_query('SELECT seesmic_video_id FROM {seesmic_videos} WHERE dsvid = %d', $dsvid));
+    if (!$seesmic_video_id) {
+      // No record, showing an error
+      drupal_set_message(t('No seesmic video found for given video id'), 'error');
+    }
+    else {
+      // Showing player
+      return theme('seesmic_player', $seesmic_video_id, $closeable, $autoplay);
+    }
+  }
+  else {
+    // No Drupal Seesmic Video ID provided
+    drupal_set_message(t('Missed Drupal Seesmic video ID'), 'error');
+  }
+  return '';
+}
+
+function seesmic_api_show_thumb_player($dsvid) {
+  if ($dsvid) {
+    // Getting seesmic video ID based on Drupal Seesmic video ID
+    $video = db_fetch_object(db_query('SELECT seesmic_video_id, thumb_url FROM {seesmic_videos} WHERE dsvid = %d', $dsvid));
+    if (!$video->seesmic_video_id) {
+      // No record, showing an error
+      drupal_set_message(t('No seesmic video found for given video id'), 'error');
+    }
+    else {
+      // Showing player
+      return theme('seesmic_thumb_player', $video->seesmic_video_id, $video->thumb_url);
+    }
+  }
+  else {
+    // No Drupal Seesmic Video ID provided
+    drupal_set_message(t('Missed Drupal Seesmic video ID'), 'error');
+  }
+  return '';
+}
+
+
+/**
+ * AJAX callback for getting raw player HTML
+ *
+ *  @return HTML
+ */
+function seesmic_api_show_rawplayer() {
+  print theme_seesmic_player($_GET['dsvid'], $_GET['closeable'], $_GET['autoplay']);
+}
+
+/**
+ * Theming function for seesmic player with clickable thumbnail for video
+ *
+ * @param string $seesmic_video_id
+ *  Seesmic video ID that should be displayed
+ * @return HTML
+ */
+
+function theme_seesmic_thumb_player($seesmic_video_id, $seesmic_video_thumb) {
+  if (!$seesmic_video_id)
+    return 'No seesmic video id provided!';
+  $seesmic_video_thumb = urldecode($seesmic_video_thumb);
+  // Since we may have several players on the page, we need to include JS only once
+  static $js_added = false;
+  $js = '';
+  // Including JS if not included yet
+  if (!$js_added) {
+    $js = '<script type="text/javascript" src="'.SEESMIC_JS_URL.'"></script>';
+  }
+  // Player HTML
+  $player = <<<PLAYER
+    <script type="text/javascript">
+	  function showPlayer_{$seesmic_video_id}(){
+	    if (typeof seesmic != "undefined") {
+	      seesmic.player.createPlayer(document.getElementById("{$seesmic_video_id}"), "{$seesmic_video_id}", "true", "false");
+	      document.getElementById("{$seesmic_video_id}_thumb").style.display = "none"; 
+          document.getElementById("{$seesmic_video_id}_close").style.display = "block"; 
+		  document.getElementById("{$seesmic_video_id}").style.display = "block"; 
+	    }
+        else {
+         document.getElementById("{$seesmic_video_id}").innerHTML = "Problem with  loading Seesmic API";
+         }
+	  } 
+	</script>
+    <a name='#{$seesmic_video_id}' /><div id="{$seesmic_video_id}"></div>
+	<div id="{$seesmic_video_id}_close" style="display: none;"><a href="#$seesmic_video_id" onclick="
+	  document.getElementById('{$seesmic_video_id}_thumb').style.display = 'block'; 
+      document.getElementById('{$seesmic_video_id}_close').style.display = 'none'; 
+	  document.getElementById('{$seesmic_video_id}').style.display = 'none';"> 
+	Close video</a></div>
+	<div id="{$seesmic_video_id}_img"><img src="{$seesmic_video_thumb}" style="cursor:pointer; cursor:hand; border:none;" id="{$seesmic_video_id}_thumb" onclick = "showPlayer_{$seesmic_video_id}()"/></div>
+	
+
+PLAYER;
+  return  $js . $player;
+}
+
+/**
+ * Theming function for seesmic player
+ *
+ * @param string $seesmic_video_id
+ *  Seesmic video ID that should be displayed
+ * @return HTML
+ */
+function theme_seesmic_player($seesmic_video_id, $closeable = TRUE, $autoplay = FALSE) {
+  if (!$seesmic_video_id)
+    return 'No seesmic video id provided!';
+  // Since we may have several players on the page, we need to include JS only once
+  static $js_added = false;
+  $js = '';
+  // Including JS if not included yet
+  if (!$js_added) {
+    $js = '<script type="text/javascript" src="'.SEESMIC_JS_URL.'"></script>';
+  }
+  // Player HTML
+  $player = <<<PLAYER
+    <div id="player_{$seesmic_video_id}" style="display:block; clear:both; width:100%; padding-top:5px;"></div>
+	<script type="text/javascript">
+	if (typeof seesmic != "undefined") {
+      seesmic.player.createPlayer(document.getElementById("player_{$seesmic_video_id}"), "{$seesmic_video_id}", "{$closeable}", "{$autoplay}");
+    } 
+	else {
+      document.getElementById("player_{$seesmic_video_id}").innerHTML = "Problem with loading Seesmic API";
+	}
+	</script>
+PLAYER
+;
+  return $js . $player;
+}
+
+/**
+ * Shows a recorder
+ *
+ * @param string $reply_to
+ *  Seesmic video ID that we recording reply to
+ * @return HTML
+ */
+function seesmic_api_show_recorder($nid = '') {
+  return theme('seesmic_recorder', $nid);
+}
+
+/**
+ * Theming function for recorder
+ *
+ * @param string $reply_to_id
+ *   Seesmic video ID that we recording reply to
+ * @return HTML
+ */
+function theme_seesmic_recorder($nid) {
+  // Site name, needed for seesmic recorder
+  $site_name = variable_get('site_name', t('Drupal Seesmic API, powered by ADYAX (www.adyax.com)'));
+  $node = node_load($nid);
+  // URL that we'll send seesmic video id to, in order to store it into Drupal database
+  $publish_url = url('seesmic/post');
+  $output .= '<script type="text/javascript" src="'.SEESMIC_JS_URL.'"></script>';
+  // Recorder HTML
+  $title = t('Video comment on @title', array('@title' => $node->title));
+  $output .= <<<HTML
+    <div id='recorder' style='display:block; clear:both; width:100%; padding-top:5px'></div>
+
+	<script type="text/javascript">
+    if(typeof seesmic != "undefined") {
+      seesmic.player.createRecorder(document.getElementById('recorder'), '{$site_name}', '');
+    }
+	else {
+	  document.getElementById('recorder').innerHTML = 'Problem with loading Seesmic API';
+	}
+	
+	function urlencode(str) {
+      str = escape(str);
+      str = str.replace('+', '%2B');
+      str = str.replace('%20', '+');
+      str = str.replace('*', '%2A');
+      str = str.replace('/', '%2F');
+      str = str.replace('@', '%40');
+      return str;
+    }
+
+    function urldecode(str) {
+      str = str.replace('+', ' ');
+      str = unescape(str);
+      return str;
+    }
+	
+    function videoFromRecorder(videoUri, title, url_thumbnail, recState, hasTitle) {
+      videoID = videoUri.split('/').reverse()[0];
+      if (videoID) {
+        $.get('{$publish_url}/' + videoID + '?thumb_url=' + urlencode(url_thumbnail), function () {
+          $('#edit-dsvid').val(videoID);
+		  if (title != '') {
+		    $('#edit-comment').val(title);
+		    $('#edit-subject').val(title);
+	      }
+		  else {
+		    $('#edit-comment').val('{$title}');
+			$('#edit-subject').val('{$title}');
+		  }
+		  document.getElementById('comment-form').submit();
+		  return;
+        }, null);
+      }
+	  document.getElementById('recorder').innerHTML = '<small>Successfully saved new video comment!</small>';
+      return 'posted';
+      }
+    </script>
+HTML
+;
+  return $output;
+}
+
+/**
+ * Implementation of hook_requirements()
+ */
+function seesmic_api_requirements($phase) {
+  $requirements = array();
+  $t = get_t();
+  switch ($phase) {
+    case 'install' :
+    case 'runtime' :
+      if (!extension_loaded('curl')) {
+        $requirements['seesmic_api_curl'] = array(
+          'title'       => $t('Seesmic API cURL'),
+          'description' => $t('In order to use Seesmic API, you must enable cURL extension'),
+          'severity'    => REQUIREMENT_ERROR,
+          'value'       => $t('Enable cURL extension')
+        );
+      }
+      if (version_compare(PHP_VERSION, SEESMIC_API_MINIMUM_PHP) < 0) {
+        $requirements['seesmic_api_php'] = array(
+          'title'       => $t('Seesmic API PHP'),
+          'description' => $t('Your PHP installation is too old. Seesmic API requires at least PHP %version.', array('%version' => SEESMIC_API_MINIMUM_PHP)),
+          'severity'    => REQUIREMENT_ERROR,
+          'value'       => $t('Upgrade your PHP installation')
+        );
+      }
+  }
+  return $requirements;
+}
+
+/**
+ * Invoke a hook_seesmic_api() operation in all modules.
+ *
+ * @param &$video
+ *   A video array.
+ * @param $op
+ *   A string containing the name of the video operation.
+ * @return
+ *   The returned value of the invoked hooks.
+ */
+function seesmic_api_invoke_seesmic_api(&$video, $op) {
+  $return = array();
+  foreach (module_implements('seesmic_api') as $name) {
+    $function = $name .'_seesmic_api';
+    $result = $function($video, $op);
+    if (isset($result) && is_array($result)) {
+      $return = array_merge($return, $result);
+    }
+    else if (isset($result)) {
+      $return[] = $result;
+    }
+  }
+  return $return;
+}
+
+/**
+ * Notice-free method to get item from array
+ *
+ * @param mixed $key
+ * @param array $src
+ * @param mixed $def
+ * @return mixed
+ */
+function g($key, $src, $def = null) {
+  return isset($src[$key]) ? $src[$key] : $def;
+}

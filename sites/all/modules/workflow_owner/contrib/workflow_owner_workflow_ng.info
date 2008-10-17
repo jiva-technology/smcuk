@@ -1,0 +1,5 @@
+; $Id: workflow_owner_workflow_ng.info,v 0
+name = Workflow Owner - Workflow NG
+description = Allows for integration between workflow owner and workflow-ng
+dependencies = workflow_owner workflow_ng
+package = "Workflow Owner - Workflow NG"

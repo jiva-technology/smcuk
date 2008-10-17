@@ -1,0 +1,5 @@
+; $Id: activity.info,v 1.1.2.1.2.2 2007/12/29 16:25:04 robertDouglass Exp $
+name = Activity
+description = Allow users to see their friends' activity on the site.
+package = Activity
+dependencies = token

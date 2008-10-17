@@ -1,0 +1,61 @@
+<?php
+// $Id: workflow_owner.install,v 0
+
+function workflow_owner_install() {
+    $ret = array();
+
+  switch ($GLOBALS['db_type']) {
+    case 'mysqli':
+    case 'mysql':
+        $ret[] = db_query(
+<<<QUERY
+
+CREATE TABLE {workflow_state_owner} (
+  `nid` int(10) unsigned NOT NULL default '0',
+  `sid` int(10) unsigned NOT NULL default '0',
+  `uid` int(10) unsigned NOT NULL default '0',
+  `comment` longtext,
+  KEY `nid` (`nid`,`sid`)
+) /*!40100 DEFAULT CHARACTER SET utf8 */;
+QUERY
+      );
+      break;
+    case 'pgsql':
+      $ret[] = db_query(
+<<<QUERY
+CREATE TABLE {workflow_state_owner} (
+  nid integer NOT NULL default '0',
+  sid integer NOT NULL default '0',
+  uid integer NOT NULL default '0',
+  comment text,
+);
+QUERY
+      );
+      $ret[] = db_query(
+<<<QUERY
+CREATE INDEX {workflow_state_owner}_nid_sid_idx ON {workflow_state_owner}(nid,sid);
+QUERY
+      );
+
+     break;
+  }
+  
+  return $ret;
+}
+
+function workflow_owner_uninstall() {
+   switch ($GLOBALS['db_type']) {
+    case 'mysqli':
+    case 'mysql':
+      
+      $ret[] = db_query("DROP TABLE {workflow_state_owner};");
+      
+      break;
+    case 'pgsql':
+      $ret[] = db_query("DROP TABLE {workflow_state_owner};");
+      break;
+   }
+   
+   return $ret;
+}
+?>

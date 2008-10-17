@@ -1,0 +1,154 @@
+<?php
+// $Id: buddylistactivity.module,v 1.1.2.6 2008/03/19 17:47:46 sirkitree Exp $
+
+/**
+ * Activity definition file
+ *
+ * This defines what hooks activity module should use
+ */
+function buddylistactivity_activity_info() {
+  return array(
+    'ops' => array('add' => t('Add'), 'remove' => t('Remove')),
+    'types' => array('buddylist' => t('Buddylist')),
+    'roles' => array(
+      'author' => array(
+        '#name' => t('Author'),
+        '#description' => t('The person who performed the action.'),
+        '#default' => '',
+      ),
+      // This is what corresponds to ACTIVITY_ALL
+      'all' => array(
+        '#name' => t('All'),
+        '#description' => t('The general public.'),
+        '#default' => '',
+      ),
+    ),
+  );
+}
+
+function buddylistactivity_token_list($type = 'buddylistactivity') {
+  if ($type == 'buddylistactivity') {
+    $tokens['buddylistactivity']['user-name']      = t('Person who added a buddy');
+    $tokens['buddylistactivity']['user-link']      = t("Link to the adder's profile");
+    $tokens['buddylistactivity']['buddy-name']     = t("Person who has been added");
+    $tokens['buddylistactivity']['buddy-link']     = t("Link to the addee's profile");
+    $tokens['buddylistactivity'] += buddylist_translation();
+    return $tokens;
+  }
+}
+
+function buddylistactivity_token_values($type, $data = NULL, $options = array()) {
+  static $users;
+  static $buddies;
+  if ($type == 'buddylistactivity' && !empty($data)) {
+    if (!isset($users[$data['user-id']])) {
+      $users[$data['user-id']] = user_load(array('uid' => $data['user-id']));
+    }
+    $user = $users[$data['user-id']];
+    if (!isset($buddies[$data['buddy-id']])) {
+      $buddies[$data['buddy-id']] = user_load(array('uid' => $data['buddy-id']));
+    }
+    $buddy = $buddies[$data['buddy-id']];
+    $user_link = theme('username', $user);
+    $buddy_link = theme('username', $buddy);
+    $tokens = array(
+      'user-name' => $user->name,
+      'user-link' => $user_link,
+      'buddy-name' => $buddy->name,
+      'buddy-link' => $buddy_link,
+    );
+    $tokens += buddylist_translation();
+    return $tokens;
+  }
+}
+
+/**
+ * Implementation of hook_buddylist_api()
+ * $arg[0] = operation
+ * $arg[1] = user being added/removed
+ * $arg[2] = user doing the add/remove
+ */
+function buddylistactivity_buddylist() {
+  global $user;
+  $args = func_get_args();
+  $action = $args[0];
+  $type = 'buddylist';
+  $data = array(
+    'user-id' => $user->uid,
+    'buddy-id' => $args[1]->uid,
+  );
+  $target_users_roles = array(
+    ACTIVITY_ALL => 'all',
+    $args[2]->uid => 'author',
+  );
+  activity_insert('buddylistactivity', $type, $action, $data, $target_users_roles);
+}
+
+function buddylistactivity_block($op = 'list', $delta = 0) {
+  global $user;
+  if ($op == 'list') {
+    $block['buddies']['info'] = t("Activity - My buddies: show activities of current user's buddies.");
+    return $block;
+  }
+  elseif ($op == 'configure') {
+    $form['items'] = array(
+      '#type' => 'select',
+      '#title' => t('Number of items'),
+      '#default_value' => variable_get('activity_block_'. $delta, 5),
+      '#options' =>drupal_map_assoc(range(1, 50)),
+    );
+    return $form;
+  }
+  elseif ($op == 'view') {
+    switch ($delta) {
+      case 'buddies':
+        if (user_access('view own activity')) {
+          $uids = array_keys(buddylist_get_buddies($user->uid, 'uid'));          
+          $activity = activity_get_activity((empty($uids) ? $user->uid : $uids), NULL, 5);
+          if ($count = count($activity)) {          
+            if ($count > variable_get('activity_block_'. $delta, 5)) {
+              $more_link = theme('activity_more_link', 'activity');
+              array_pop($activity);
+            }        
+            $activites = array();
+            foreach ($activity as $item) {
+              $activities[] = theme('activity', activity_token_replace($item), $item);
+            }        
+            return array('title' => t('My @buddies\' activity', buddylist_translation()),
+              'content' => theme('activity_block', $activities, $more_link));
+          }
+        }
+        break;
+    }
+  }
+}
+
+function buddylistactivity_menu($may_cache) {
+  $items = array();
+  global $user;
+  
+  if ($may_cache) {
+    $items[] = array(
+      'path' => 'activity/buddies',
+      'title' => t('My buddies\' activity'),
+      'callback' => 'buddylistactivity_page',
+      'access' => $user->uid,
+      'type' => MENU_LOCAL_TASK,
+      'access' => user_access('view own activity'),
+    );
+  }
+  
+  return $items;
+}
+
+function buddylistactivity_page($page = 'buddies') {
+  global $user;
+  if ($page == 'buddies') {
+    if (user_access('view own activity')) {      
+      $uids = array_keys(buddylist_get_buddies($user->uid, 'uid'));
+      $activities = activity_get_activity((empty($uids) ? $user->uid : $uids), NULL, 20);
+      $table = activity_table($activities);
+      return theme('activity_page', $activities, $table);
+    }
+  }
+}

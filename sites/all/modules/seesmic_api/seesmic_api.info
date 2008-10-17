@@ -1,0 +1,5 @@
+name = Seesmic API
+description = "Implementation of Seesmic API for Drupal by Adyax (www.adyax.com)"
+package = Seesmic
+version = 1.0
+datestamp = 1212575725

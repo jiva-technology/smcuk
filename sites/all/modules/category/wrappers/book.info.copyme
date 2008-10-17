@@ -1,0 +1,5 @@
+; $Id: book.info.copyme,v 1.1 2007/01/05 15:31:16 jaza Exp $
+name = Book
+description = Wrapper module to provide a compatibility layer between the book module and the category module.
+package = Category
+dependencies = category

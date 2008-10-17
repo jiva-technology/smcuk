@@ -1,0 +1,5 @@
+; $Id: category_export.info,v 1.1 2007/01/05 15:31:15 jaza Exp $
+name = Category export
+description = Allows category trees to be exported as printer-friendly HTML.
+package = Category
+dependencies = category

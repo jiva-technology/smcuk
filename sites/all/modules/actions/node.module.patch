@@ -1,0 +1,17 @@
+Index: node.module
+===================================================================
+RCS file: /cvs/drupal/drupal/modules/node/node.module,v
+retrieving revision 1.776.2.22
+diff -u -p -r1.776.2.22 node.module
+--- node.module	7 Jan 2008 01:31:26 -0000	1.776.2.22
++++ node.module	11 Mar 2008 11:29:36 -0000
+@@ -561,6 +561,9 @@ function node_load($param = array(), $re
+  * Save a node object into the database.
+  */
+ function node_save(&$node) {
++  // Let modules modify the node before it is saved to the database.
++  node_invoke ($node, 'presave');
++  node_invoke_nodeapi($node, 'presave');
+   global $user;
+ 
+   $node->is_new = FALSE;

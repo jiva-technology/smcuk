@@ -1,0 +1,5 @@
+; $Id: subscriptions_cck.info,v 1.1.2.1 2008/04/14 22:25:50 chx Exp $
+name = CCK Fields
+description = Provides CCK field data as mail variables.
+package = "Subscriptions"
+dependencies = subscriptions subscriptions_content content

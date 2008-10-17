@@ -1,0 +1,310 @@
+<?php
+// $Id: category_export.module,v 1.10 2007/01/05 15:31:15 jaza Exp $
+
+/**
+ * @file
+ * Allows category trees to be exported as printer-friendly HTML.
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function category_export_help($section) {
+  switch ($section) {
+    case 'admin/help#category_export':
+      return t('<p>The category export module allows category trees to be exported as printer-friendly HTML. Users with the \'view printer-friendly categories\' permission will see a \'view printer-friendly version\' link on category pages, which they can click to access the printer-friendly HTML. This module requires the category module.</p>');
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function category_export_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+  switch ($op) {
+    case 'load':
+      if (category_is_cat_or_cont($node->nid)) {
+        $type = category_node_get_type($node);
+        $is_cat = $type == 'category_cat';
+        if (!$is_cat) {
+          return (array)category_export_cont_load($node->nid);
+        }
+        else {
+          return (array)category_export_cont_load($node->cnid);
+        }
+      }
+      break;
+    case 'insert':
+    case 'update':
+      $op = $_POST['op'];
+      $submit_values = array(
+        'insert' => t('Add to category outline'),
+        'update' => t('Update category outline'),
+        'delete' => t('Remove from category outline'),
+      );
+      if (in_array($op, $submit_values)) {
+        switch ($op) {
+          case $submit_values['insert']:
+          case $submit_values['update']:
+            category_export_cont_update($node);
+            break;
+          case $submit_values['delete']:
+            category_export_cont_delete($node->nid);
+            break;
+        }
+      }
+      elseif (category_is_cat_or_cont($node->nid, TRUE)) {
+        $type = category_node_get_type($node);
+        $is_cat = $type == 'category_cat';
+        if (!$is_cat) {
+          category_export_cont_update($node);
+        }
+      }
+      break;
+    case 'delete':
+      $type = category_node_get_type($node);
+      $is_cat = $type == 'category_cat';
+      if (!$is_cat) {
+        category_export_cont_delete($node->nid);
+      }
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_category().
+ */
+function category_export_category($op, $node = NULL) {
+  switch ($op) {
+    case 'form':
+      // Export settings
+
+      $options = module_invoke_all('category_export');
+      if (!isset($options)) {
+        $options = array();
+      }
+
+      $form['category_export'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Category export settings'),
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+      );
+      $form['category_export']['export_types'] = array(
+        '#type' => 'checkboxes',
+        '#title' => t('Allowed export types'),
+        '#default_value' => isset($node->export_types) ? $node->export_types : array(),
+        '#options' => $options,
+        '#description' => '<p>'. t('You may allow this container and all categories within it to be exported in a variety of formats. The number of export options available depends on what export modules you have installed. Users will only be able to perform the exports that they have access to (as defined on the access control page). Additionally, if this container or any categories within it has distant children, then those children will be included in an export, if the relevant export is enabled for that container as well.'. '</p><p>'. t('<strong>Note:</strong> if you are using export modules that were written for the book module, then these modules will work with the category module (through the book wrapper), but will not be configurable on a per-container basis. So book-export modules, such as export_dxml and export_opml, will not be listed here.')),
+      );
+
+      return $form;
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_category_legacy().
+ */
+function category_export_category_legacy($op, &$items, $edit = NULL) {
+  switch ($op) {
+    case 'import_taxonomy_prepare':
+    case 'import_book_prepare':
+      foreach ($items as $key => $item) {
+        $fields = array('export_types');
+        foreach ($fields as $field) {
+          $items[$key][$field] = $edit[$field];
+        }
+      }
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_category_export().
+ *
+ */
+function category_export_category_export() {
+  return array('html' => t('Printer-friendly HTML'));
+}
+
+/**
+ * Responds to the load of an existing container, by loading the container's
+ * export settings from the database.
+ *
+ * @param $nid
+ *   The node ID of the container being loaded.
+ *
+ * @return
+ *   The export settings for the specified node.
+ */
+function category_export_cont_load($nid) {
+  $container = new stdClass();
+  $container->export_types = array();
+  $sql = db_query("SELECT * FROM {category_export} WHERE cid = %d", $nid);
+  while ($result = db_fetch_object($sql)) {
+    $container->export_types[] = $result->export_type;
+  }
+
+  return $container;
+}
+
+/**
+ * Responds to the insert or update of an existing container, by updating the
+ * container's export settings in the database.
+ *
+ * @param $node
+ *   The container node being updated.
+ */
+function category_export_cont_update($node) {
+  category_export_cont_delete($node->nid);
+
+  $node->cid = $node->nid;
+  $fields = array(
+    'cid',
+    'export_type',
+  );
+
+  if (isset($node->export_types) && is_array($node->export_types)) {
+    foreach ($node->export_types as $export_type => $value) {
+      if ($value) {
+        db_query('INSERT INTO {category_export} '. _category_container_insert($node, 1, $fields) .' VALUES (%d, \'%s\')', $node->cid, $export_type);
+      }
+    }
+  }
+}
+
+/**
+ * Responds to the delete of an existing container, by deleting the container's
+ * export settings in the database.
+ *
+ * @param $nid
+ *   The node ID of the container being deleted.
+ */
+function category_export_cont_delete($nid) {
+  db_query('DELETE FROM {category_export} WHERE cid = %d', $nid);
+}
+
+/**
+ * Implementation of hook_link().
+ */
+function category_export_link($type, $node = 0, $main = 0) {
+  $links = array();
+
+  if ($type == 'node' && isset($node->parents)) {
+    if (!$main && isset($node->export_types) && in_array('html', $node->export_types)) {
+      if (user_access('see printer-friendly categories')) {
+        $links['category_export_html'] = array(
+          'title' => t('printer-friendly version'),
+          'href' => 'category/export/html/'. $node->nid,
+          'attributes' => array('title' => t('Show a printer-friendly version of this category and its sub-pages.'))
+        );
+      }
+    }
+  }
+
+  return $links;
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function category_export_perm() {
+    return array('see printer-friendly categories');
+}
+
+/**
+ * This function is called by category_export() to generate HTML for export.
+ *
+ * The given node is /embedded to its absolute depth in a top level
+ * section/.  For example, a child node with depth 2 in the hierarchy
+ * is contained in (otherwise empty) &lt;div&gt; elements
+ * corresponding to depth 0 and depth 1.  This is intended to support
+ * WYSIWYG output - e.g., level 3 sections always look like level 3
+ * sections, no matter their depth relative to the node selected to be
+ * exported as printer-friendly HTML.
+ *
+ * @param nid
+ *   - an integer representing the node id (nid) of the node to export
+ * @param depth
+ * - an integer giving the depth in the category hierarchy of the node
+       which is to be exported
+ * @return
+ * - string containing HTML representing the node and its children in
+       the category hierarchy
+*/
+function category_export_html($nid, $depth) {
+  if (user_access('see printer-friendly categories')) {
+    global $base_url;
+    for ($i = 1; $i < $depth; $i++) {
+      $output .= "<div class=\"section-$i\">\n";
+    }
+    $output .= category_recurse($nid, $depth, 'category_export_html_pre', 'category_export_html_post', 'html');
+    for ($i = 1; $i < $depth; $i++) {
+      $output .= "</div>\n";
+
+    }
+    $title = check_plain($node->title);
+    return theme('category_export_html', $title, $output);
+  }
+  else {
+    drupal_access_denied();
+  }
+}
+
+/**
+ * How the category's HTML export should be themed
+ *
+ * @ingroup themeable
+ */
+function theme_category_export_html($title, $content) {
+  global $base_url;
+  $html = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Transitional//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd\">\n";
+  $html .= '<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">';
+  $html .= "<head>\n<title>". $title ."</title>\n";
+  $html .= '<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />';
+  $html .= '<base href="'. $base_url .'/" />' . "\n";
+  $html .= "<style type=\"text/css\">\n@import url(misc/print.css);\n</style>\n";
+  $html .= "</head>\n<body>\n". $content . "\n</body>\n</html>\n";
+  return $html;
+}
+
+/**
+ * Generates printer-friendly HTML for a node.  This function
+ * is a 'pre-node' visitor function for category_recurse().
+ *
+ * @param $node
+ *   - the node to generate output for.
+ * @param $depth
+ *   - the depth of the given node in the hierarchy. This
+ *   is used only for generating output.
+ * @param $nid
+ *   - the node id (nid) of the given node. This
+ *   is used only for generating output.
+ * @return
+ *   - the HTML generated for the given node.
+ */
+function category_export_html_pre($node, $depth, $nid) {
+  // Output the content:
+  if (node_hook($node, 'content')) {
+    $node = node_invoke($node, 'content');
+  }
+  // Allow modules to change $node->body before viewing.
+  node_invoke_nodeapi($node, 'print', $node->body, false);
+
+  $output .= "<div id=\"node-". $node->nid ."\" class=\"section-$depth\">\n";
+  $output .= "<h1 class=\"book-heading\">". check_plain($node->title) ."</h1>\n";
+
+  if ($node->body) {
+    $output .= $node->body;
+  }
+  return $output;
+}
+
+/**
+ * Finishes up generation of printer-friendly HTML after visiting a
+ * node. This function is a 'post-node' visitor function for
+ * category_recurse().
+ */
+function category_export_html_post($node, $depth) {
+  return "</div>\n";
+}

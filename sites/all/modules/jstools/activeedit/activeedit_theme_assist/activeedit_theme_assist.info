@@ -1,0 +1,5 @@
+; $Id: activeedit_theme_assist.info,v 1.2 2007/06/18 22:53:46 dww Exp $
+name =  Activeedit Theme Assist
+description = Helper module for theming Active Edit selectors.
+package = Javascript tools
+dependencies = activeedit

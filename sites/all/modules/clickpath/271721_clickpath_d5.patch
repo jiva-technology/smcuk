@@ -1,0 +1,48 @@
+--- clickpath.module	2007-12-11 20:44:39.000000000 -0800
++++ clickpath.module	2008-06-17 20:03:44.000000000 -0700
+@@ -2,6 +2,12 @@
+ // $Id: clickpath.module,v 1.1.2.1.2.2 2007/12/12 04:44:39 eaton Exp $
+ 
+ /**
++*experimental add back port of D6 functionality
++**/
++
++include_once ("clickpath.inc");
++
++/**
+  * @file
+  * Saves and displays the user's most recently visited links in the site.
+  *
+@@ -23,15 +29,16 @@ function clickpath_perm() {
+  *
+  * Exposes the Clickpath administration page.
+  */
+-function clickpath_menu() {
+-  $items['admin/settings/clickpath'] = array(
+-    'title' => 'Clickpath settings',
+-    'description' => 'Configure what information will be displayed about the paths users take when clicking through the site.',
+-    'page callback' => 'drupal_get_form',
+-    'page arguments' => array('clickpath_admin_settings'),
+-    'access arguments' => array('administer site configuration'),
+-    'type' => MENU_NORMAL_ITEM,
+-  );
++function clickpath_menu($may_cache) {
++  if ($may_cache) {
++    $items[] = array('path' => 'admin/settings/clickpath',
++      'title' => t('Clickpath settings'),
++      'callback' => 'drupal_get_form',
++      'callback arguments' => 'clickpath_admin_settings',
++      'access' => user_access('administer site configuration'),
++      'description' => t('Configure what information will be displayed about the paths users take when clicking through the site.'),
++    );
++  }
+ 
+   return $items;
+ }
+@@ -178,4 +185,4 @@ function clickpath_save_path($path) {
+     }
+     $_SESSION['clickpath'] = $clickpath;
+   }
+-}
+\ No newline at end of file
++}

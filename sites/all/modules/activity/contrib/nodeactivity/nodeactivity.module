@@ -1,0 +1,101 @@
+<?php
+// $Id: nodeactivity.module,v 1.1.2.11 2008/03/19 18:02:53 sirkitree Exp $
+
+/**
+ * Activity definition file
+ *
+ * This defines what hooks activity module should use
+ */
+function nodeactivity_activity_info() {
+  $types = node_get_types();
+  foreach ($types as $type) {
+    $token_types[$type->type] = $type->name;
+  }
+  return array(
+    'ops' => array('insert' => t('Create'), 'update' => t('Update'), 'delete' => t('Delete')),
+    'types' => $token_types,
+    'roles' => array(
+      'author' => array(
+        '#name' => t('Author'),
+        '#description' => t('The person who created the node.'),
+        '#default' => 'You [operation]d the [node-type] [node-title-link]',
+      ),
+      // This is what corresponds to ACTIVITY_ALL
+      'all' => array(
+        '#name' => t('All'),
+        '#description' => t('The general public.'),
+        '#default' => '[author] [operation]d the [node-type] [node-title-link]',
+      ),
+    ),
+  );
+}
+
+/**
+ * Token module integration.
+ */
+function nodeactivity_token_list($type = 'all') {
+  if ($type == 'nodeactivity') {
+    $tokens['nodeactivity'] = array('node-id'  => t('Id of the post'),
+      'operation' => t('The verb of the operation that took place, eg. "create", "update", "delete"'),
+      'author' => t('Person who authored the node'),
+      'node-title' => t('Title of the post'),
+      'node-title-link' => t('Link to the post'),
+      'node-type' => t('The type of post'),
+      'author-name' => t('The name of the author'),
+    );
+
+    return $tokens;
+  }
+}
+
+function nodeactivity_token_values($type, $data = NULL, $options = array()) {
+  static $authors;
+  if ($type == 'nodeactivity' && !empty($data)) {
+    if (!isset($authors[$data['author-uid']])) {
+    $author = db_fetch_object(db_query('SELECT uid, name FROM {users} WHERE uid = %d', $data['author-uid']));
+      $authors[$data['author-uid']] = theme('username', $author);
+    }
+    $data['author'] = $authors[$data['author-uid']];
+    return $data;
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi()
+ */
+function nodeactivity_nodeapi($node, $op, $teaser, $page) {
+  switch ($op) {
+    case 'insert':
+    case 'update':
+    case 'delete':
+      if ($node->status == 1) {
+        $operation = $op == 'insert' ? t('create') : t($op);
+        $type = $node->type;
+
+        // This is all the information you'll need later in order to build
+        // the activity message.
+        $user = user_load(array('uid' => $node->uid));
+        $data = array(
+          'operation' => $operation,
+          'node-id' => $node->nid,
+          'author-uid' => $node->uid,
+          'node-title' => $node->title,
+          'node-type' => strtolower(node_get_types('name', $node->type)),
+          'node-title-link' => l($node->title, 'node/'. $node->nid),
+          'author-name' => $node->name,
+        );
+        // This determines who sees messages based on this data.
+        // This implementation will ensure that the activity is shown
+        // to the special group ACTIVITY_ALL (everybody, basically),
+        // as well as to the person who inserted, updated or deleted the node.
+        // The use of the role (all and author) ensures that we know later how
+        // to address the person... ie "You" or "Bob".
+        $target_users_roles = array(
+          ACTIVITY_ALL => 'all',
+          $node->uid => 'author'
+        );
+        activity_insert('nodeactivity', $type, $op, $data, $target_users_roles);
+      }
+      break;
+  }
+}

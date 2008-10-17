@@ -1,0 +1,36 @@
+<?php
+// $Id: category_views.install,v 1.2 2006/04/14 13:52:03 jaza Exp $
+
+/**
+ * @file
+ * Update file for the category_views module. All functions in this
+ * file are implementations of hook_update_N(), unless indicated otherwise.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function category_views_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("CREATE TABLE {category_views} (
+        cid int(10) unsigned NOT NULL default '0',
+        view_id tinyint(3) unsigned NOT NULL default '0',
+        display_cont tinyint(3) unsigned NOT NULL default '0',
+        display_cat tinyint(3) unsigned NOT NULL default '0',
+        PRIMARY KEY (cid)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */
+      ");
+      break;
+    case 'pgsql':
+      db_query("CREATE TABLE {category_views} (
+        cid integer NOT NULL default '0',
+        view_id smallint NOT NULL default '0',
+        display_cont smallint NOT NULL default '0',
+        display_cat smallint NOT NULL default '0',
+        PRIMARY KEY (cid)
+      )");
+      break;
+  }
+}

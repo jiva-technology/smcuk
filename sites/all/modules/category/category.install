@@ -1,0 +1,270 @@
+<?php
+// $Id: category.install,v 1.11 2007/01/05 15:31:15 jaza Exp $
+
+/**
+ * @file
+ * Update file for the category and related modules. All functions in this
+ * file are implementations of hook_update_N(), unless indicated otherwise.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function category_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("CREATE TABLE {category} (
+        cid int(10) unsigned NOT NULL default '0',
+        cnid int(10) unsigned NOT NULL default '0',
+        description longtext NOT NULL default '',
+        weight tinyint(4) NOT NULL default '0',
+        depth tinyint(4) NOT NULL default '0',
+        PRIMARY KEY (cid),
+        KEY tid (cnid),
+        KEY weight (weight)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */
+      ");
+      db_query("CREATE TABLE {category_hierarchy} (
+        cid int(10) unsigned NOT NULL default '0',
+        parent int(10) unsigned NOT NULL default '0',
+        PRIMARY KEY (cid, parent),
+        KEY nid (cid),
+        KEY parent (parent)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */
+      ");
+      db_query("CREATE TABLE {category_node} (
+        nid int(10) unsigned NOT NULL default '0',
+        cid int(10) unsigned NOT NULL default '0',
+        PRIMARY KEY (cid, nid),
+        KEY nid (nid),
+        KEY cid (cid)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */
+      ");
+      db_query("CREATE TABLE {category_relation} (
+        cid1 int(10) unsigned NOT NULL default '0',
+        cid2 int(10) unsigned NOT NULL default '0',
+        KEY nid1 (cid1),
+        KEY nid2 (cid2)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */
+      ");
+      db_query("CREATE TABLE {category_synonym} (
+        cid int(10) unsigned NOT NULL default '0',
+        name varchar(255) NOT NULL default '',
+        KEY nid (cid),
+        KEY name (name(3))
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */
+      ");
+      db_query("CREATE TABLE {category_cont} (
+        cid int(10) unsigned NOT NULL default '0',
+        admin_title varchar(128) NOT NULL default '',
+        help varchar(255) NOT NULL default '',
+        module varchar(255) NOT NULL default '',
+        has_relations tinyint(3) unsigned NOT NULL default '0',
+        has_synonyms tinyint(3) unsigned NOT NULL default '0',
+        hierarchy tinyint(3) unsigned NOT NULL default '0',
+        multiple tinyint(3) unsigned NOT NULL default '0',
+        required tinyint(3) unsigned NOT NULL default '0',
+        tags tinyint(3) unsigned NOT NULL default '0',
+        hidden_cont tinyint(3) unsigned NOT NULL default '0',
+        PRIMARY KEY (cid)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */
+      ");
+      db_query("CREATE TABLE {category_cont_distant} (
+        cid int(10) unsigned NOT NULL default '0',
+        allowed_parent varchar(255) NOT NULL default '',
+        PRIMARY KEY (cid, allowed_parent),
+        KEY nid (cid),
+        KEY allowed_parent (allowed_parent)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */
+      ");
+      db_query("CREATE TABLE {category_cont_node_types} (
+        cid int(10) unsigned NOT NULL default '0',
+        type varchar(32) NOT NULL default '',
+        PRIMARY KEY (cid, type)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */
+      ");
+      break;
+    case 'pgsql':
+      db_query("CREATE TABLE {category} (
+        cid integer NOT NULL default '0',
+        cnid integer NOT NULL default '0',
+        description text NOT NULL default '',
+        weight smallint NOT NULL default '0',
+        depth smallint NOT NULL default '0',
+        PRIMARY KEY (cid)
+      )");
+      db_query("CREATE INDEX {category}_cnid_idx ON {category}(cnid)");
+      db_query("CREATE INDEX {category}_weight_idx ON {category}(weight)");
+      db_query("CREATE TABLE {category_hierarchy} (
+        cid integer NOT NULL default '0',
+        parent integer NOT NULL default '0',
+        PRIMARY KEY (cid, parent)
+      )");
+      db_query("CREATE INDEX {category_hierarchy}_cid_idx ON {category_hierarchy}(cid)");
+      db_query("CREATE INDEX {category_hierarchy}_parent_idx ON {category_hierarchy}(parent)");
+      db_query("CREATE TABLE {category_node} (
+        nid integer NOT NULL default '0',
+        cid integer NOT NULL default '0',
+        PRIMARY KEY (cid, nid)
+      )");
+      db_query("CREATE INDEX {category_node}_nid_idx ON {category_node}(nid)");
+      db_query("CREATE INDEX {category_node}_cid_idx ON {category_node}(cid)");
+      db_query("CREATE TABLE {category_relation} (
+        cid1 integer  NOT NULL default '0',
+        cid2 integer  NOT NULL default '0'
+      )");
+      db_query("CREATE INDEX {category_relation}_cid1_idx ON {category_relation}(cid1)");
+      db_query("CREATE INDEX {category_relation}_cid2_idx ON {category_relation}(cid2)");
+      db_query("CREATE TABLE {category_synonym} (
+        cid integer  NOT NULL default '0',
+        name varchar(255) NOT NULL default ''
+      )");
+      db_query("CREATE INDEX {category_synonym}_cid_idx ON {category_synonym}(cid)");
+      db_query("CREATE INDEX {category_synonym}_name_idx ON {category_synonym}(name)");
+      db_query("CREATE TABLE {category_cont} (
+        cid integer  NOT NULL default '0',
+        admin_title varchar(128) NOT NULL default '',
+        help varchar(255) NOT NULL default '',
+        module varchar(255) NOT NULL default '',
+        has_relations smallint  NOT NULL default '0',
+        has_synonyms smallint  NOT NULL default '0',
+        hierarchy smallint  NOT NULL default '0',
+        multiple smallint  NOT NULL default '0',
+        required smallint  NOT NULL default '0',
+        tags smallint  NOT NULL default '0',
+        hidden_cont smallint  NOT NULL default '0',
+        PRIMARY KEY (cid)
+      )");
+      db_query("CREATE TABLE {category_cont_distant} (
+        cid integer  NOT NULL default '0',
+        allowed_parent varchar(255) NOT NULL default '',
+        PRIMARY KEY (cid, allowed_parent)
+      )");
+      db_query("CREATE INDEX {category_cont_distant}_cid_idx ON {category_cont_distant}(cid)");
+      db_query("CREATE INDEX {category_cont_distant}_allowed_parent_idx ON {category_cont_distant}(allowed_parent)");
+      db_query("CREATE TABLE {category_cont_node_types} (
+        cid integer  NOT NULL default '0',
+        type varchar(32) NOT NULL default '',
+        PRIMARY KEY (cid, type)
+      )");
+      break;
+  }
+}
+
+function category_update_1() {
+  return _system_update_utf8(array('category', 'category_cont', 'category_cont_node_types', 'category_display', 'category_hierarchy', 'category_legacy', 'category_menu', 'category_menu_map', 'category_node', 'category_relation', 'category_synonym'));
+}
+
+function category_update_2() {
+  $ret[] = update_sql('ALTER TABLE {category_cont} CHANGE children_have_distant children_allowed_parents VARCHAR(255) NOT NULL DEFAULT \'\'');
+
+  return $ret;
+}
+
+function category_update_3() {
+  $ret[] = update_sql('CREATE TABLE {category_export} ( cid int(10) unsigned NOT NULL default \'0\', export_type varchar(255) NOT NULL default \'\', PRIMARY KEY  (cid, export_type) ) /*!40100 DEFAULT CHARACTER SET utf8 */');
+
+  return $ret;
+}
+
+function category_update_4() {
+  $ret[] = update_sql('CREATE TABLE {category_views} ( cid int(10) unsigned NOT NULL default \'0\', view_id tinyint(3) unsigned NOT NULL default \'0\', display_cont tinyint(3) unsigned NOT NULL default \'0\', display_cat tinyint(3) unsigned NOT NULL default \'0\', PRIMARY KEY (cid) ) /*!40100 DEFAULT CHARACTER SET utf8 */');
+
+  return $ret;
+}
+
+function category_update_5() {
+  $ret[] = update_sql('ALTER TABLE {category_cont} DROP children_allowed_parents');
+  $ret[] = update_sql('CREATE TABLE {category_cont_distant} ( cid int(10) unsigned NOT NULL default \'0\', allowed_parent varchar(255) NOT NULL default \'\', PRIMARY KEY (cid, allowed_parent), KEY nid (cid), KEY allowed_parent (allowed_parent) ) /*!40100 DEFAULT CHARACTER SET utf8 */');
+
+  $containers = category_get_containers();
+  foreach ($containers as $cont) {
+    db_query('INSERT INTO {category_cont_distant} (cid, allowed_parent) VALUES (%d, \'%s\')', $cont->cid, '0');
+  }
+
+  return $ret;
+}
+
+function category_update_6() {
+  $ret[] = update_sql('ALTER TABLE {category_display} ADD show_listing tinyint(3) unsigned NOT NULL default \'0\'');
+  db_query('UPDATE {category_display} SET show_listing = 1');
+
+  return $ret;
+}
+
+function category_update_7() {
+  $ret[] = update_sql('ALTER TABLE {category_cont_node_types} CHANGE type type VARCHAR(32) NOT NULL default \'\'');
+
+  return $ret;
+}
+
+function category_update_8() {
+  $ret[] = update_sql('ALTER TABLE {category_cont} ADD admin_title varchar(128) NOT NULL default \'\' AFTER cid');
+
+  return $ret;
+}
+
+/**
+ * Drupal 5.0 updates
+ */
+function category_update_9() {
+  // Node types may no longer contain hyphens.
+  $ret[] = update_sql("UPDATE {node} SET type = 'category_cat' WHERE type = 'category-cat'");
+  $ret[] = update_sql("UPDATE {node} SET type = 'category_cont' WHERE type = 'category-cont'");
+
+  // Some of our variables need to be renamed.
+  $result = db_query("SELECT name FROM {variable} WHERE name LIKE 'category_nodeapi_%_containers'");
+  while ($row = db_fetch_array($result)) {
+    // Determine the new name of the variable
+    $name = str_replace('-', '_', preg_replace('/^category_nodeapi_(.*)_containers$/U','category_nodeapi_containers_$1', $row['name']));
+    // Change the name.
+    $ret[] = update_sql("UPDATE {variable} SET name = '". db_escape_string($name) ."' WHERE name = '". db_escape_string($row['name']) ."'");
+  }
+
+  // Some more similar variable renaming.
+  $result = db_query("SELECT name, value FROM {variable} WHERE name LIKE 'category_nodeapi_%' AND name NOT LIKE 'category_nodeapi_containers_%'");
+  while ($row = db_fetch_array($result)) {
+    // Determine the new name of the variable
+    $name = str_replace('-', '_', $row['name']);
+    $value = str_replace('-', '_', $row['value']);
+    // Change the name.
+    $ret[] = update_sql("UPDATE {variable} SET name = '". db_escape_string($name) ."', value = '". db_escape_string($value) ."' WHERE name = '". db_escape_string($row['name']) ."'");
+  }
+
+  cache_clear_all();
+
+  // Update the keys of the 'category_allow_nodetypes' variable.
+  $allow_nodetypes = variable_get('category_allow_nodetypes', array('category_cat' => 0, 'category_cont' => 0));
+  foreach ($allow_nodetypes as $nodetype => $val) {
+    if (strpos($nodetype, '-') !== FALSE) {
+      $new_nodetype = str_replace('-', '_', $nodetype);
+      if ($nodetype === $val) {
+        $allow_nodetypes[$new_nodetype] = $new_nodetype;
+      }
+      else {
+        $allow_nodetypes[$new_nodetype] = $val;
+      }
+      unset($allow_nodetypes[$nodetype]);
+    }
+  }
+  variable_set('category_allow_nodetypes', $allow_nodetypes);
+
+  // Update the keys and values of the 'category_base_nodetypes' variable.
+  $base_nodetypes = variable_get('category_base_nodetypes', array('category_cat' => 'category_cat', 'category_cont' => 'category_cont'));
+  foreach ($base_nodetypes as $nodetype => $val) {
+    if (strpos($nodetype, '-') !== FALSE) {
+      $new_nodetype = str_replace('-', '_', $nodetype);
+      if ($nodetype === $val) {
+        $base_nodetypes[$new_nodetype] = $new_nodetype;
+      }
+      else {
+        $base_nodetypes[$new_nodetype] = $val;
+      }
+      unset($base_nodetypes[$nodetype]);
+    }
+  }
+  variable_set('category_base_nodetypes', $base_nodetypes);
+
+  return $ret;
+}

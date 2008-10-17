@@ -1,0 +1,653 @@
+<?php
+// $Id: category_menu.module,v 1.38 2007/01/05 15:31:15 jaza Exp $
+
+/**
+ * @file
+ * Creates and manages a set of menu items that correspond to the site's category hierarchy.
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function category_menu_help($section) {
+  switch ($section) {
+    case 'admin/help#category_menu':
+      return t('<p>The category menu module creates and manages a set of menu items that correspond to your site\'s category hierarchy. These menu items are static rather than dynamic, so that you can add other menu items (such as module index pages) as children using the menu module. Breadcrumbs for category and container pages (and, optionally, assigned node pages) will reflect the managed menu items. You can also display the menu as a block on your site.</p><p>This module requires the category module.</p>');
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function category_menu_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+  switch ($op) {
+    case 'load':
+      if (category_is_cat_or_cont($node->nid)) {
+        $is_cat = !empty($node->cnid);
+        if (!$is_cat) {
+          return (array)category_menu_cont_load($node->nid);
+        }
+        else {
+          return (array)category_menu_cont_load($node->cnid);
+        }
+      }
+      break;
+    case 'insert':
+      category_menu_entity_inserted($node);
+      break;
+    case 'update':
+      $op = $_POST['op'];
+      $submit_values = array(
+        'insert' => t('Add to category outline'),
+        'update' => t('Update category outline'),
+        'delete' => t('Remove from category outline'),
+      );
+      if (in_array($op, $submit_values)) {
+        switch ($op) {
+          case $submit_values['insert']:
+            category_menu_entity_inserted($node);
+            break;
+          case $submit_values['update']:
+            category_menu_entity_updated($node);
+            break;
+          case $submit_values['delete']:
+            category_menu_entity_deleted($node, TRUE);
+            break;
+        }
+      }
+      else {
+        if (!$node->nid) {
+          category_menu_entity_inserted($node);
+        }
+        else {
+          category_menu_entity_updated($node);
+        }
+      }
+      break;
+    case 'delete':
+      category_menu_entity_deleted($node);
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_category().
+ */
+function category_menu_category($op, $node = NULL) {
+  switch ($op) {
+    case 'settings':
+      // Menu item settings
+      $form['category_menu'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Menu item settings'),
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+      );
+      $form['category_menu']['category_menu_default_menu'] = array(
+        '#type' => 'select',
+        '#title' => t('Default menu'),
+        '#default_value' => variable_get('category_menu_default_menu', 1),
+        '#options' => menu_get_root_menus(),
+        '#description' => t('The menu in which menu items for categories and containers will be populated and managed. This can be the default <em>Navigation</em> menu, or another (custom) menu.'),
+      );
+
+      return $form;
+      break;
+    case 'form':
+      // Menu item settings
+      $form['category_menu'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Category menu items'),
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+        '#description' => t('For categories and containers, these settings only affect new nodes; update operations are performed if a menu item already exists for a particular category or container, regardless of these settings. For assigned nodes, these settings affect new and existing nodes. For categories and containers, if the parent of the node being created does not have a menu item, then the system will traverse all ancestors (of lightest weight) in the category tree, until one with a menu item is found, or until the top of the tree is reached.'),
+      );
+      $options = array(
+        0 => t('Disabled'),
+        1 => t('Enabled'),
+        2 => t('Enabled (breadcrumbs only)'),
+      );
+      $form['category_menu']['item_for_cats'] = array(
+        '#type' => 'radios',
+        '#title' => t('Menu items within this container'),
+        '#default_value' => isset($node->item_for_cats) ? $node->item_for_cats : 1,
+        '#options' => ($options + array(3 => t('Enabled (and display each item expanded)'))),
+        '#description' => t('If enabled, menu items are automatically created and maintained for child categories. If set to \'enabled (breadcrumbs only)\', then menu links will not be visible, but breadcrumbs will be. If this container has its \'hidden\' attribute <em>disabled</em>, a menu item is also created and maintained for the container itself. In this context, a child category is one that belongs to this container, even if it has another container as its distant parent. If a category has multiple parents, then it will be placed underneath the parent with the <strong>lightest weight</strong> as a menu item.'),
+      );
+      $form['category_menu']['item_for_nodes'] = array(
+        '#type' => 'radios',
+        '#title' => t('Menu items for assigned nodes'),
+        '#default_value' => isset($node->item_for_nodes) ? $node->item_for_nodes : 0,
+        '#options' => $options,
+        '#description' => t('If enabled, menu items are automatically created and maintained for nodes assigned under one or more child categories. If set to \'enabled (but disable each item)\', then menu links will not be visible, but breadcrumbs will be. Nodes will be placed underneath whatever category is of the <strong>lightest weight</strong>.'),
+      );
+
+      return $form;
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_category_legacy().
+ */
+function category_menu_category_legacy($op, &$items, $edit = NULL) {
+  switch ($op) {
+    case 'import_taxonomy_prepare':
+    case 'import_book_prepare':
+      foreach ($items as $key => $item) {
+        $fields = array('item_for_cats', 'item_for_nodes');
+        foreach ($fields as $field) {
+          $items[$key][$field] = $edit[$field];
+        }
+      }
+      break;
+  }
+}
+
+/**
+ * Responds to the load of an existing container, by loading the container's
+ * menu settings from the database.
+ *
+ * @param $nid
+ *   The node ID of the container being loaded.
+ *
+ * @return
+ *   The menu settings for the specified node, or 0 if none could be found.
+ */
+function category_menu_cont_load($nid, $reset = FALSE) {
+  static $containers;
+
+  // Grab all mappings in one query, and store in a simple cache
+  if (!isset($containers) || $reset) {
+    $containers = array();
+    $result = db_query("SELECT * FROM {category_menu}");
+    while ($container = db_fetch_object($result)) {
+      $containers[$container->cid] = $container;
+      unset($containers[$container->cid]->cid);
+    }
+  }
+
+  if (isset($containers[$nid])) {
+    return $containers[$nid];
+  }
+  else {
+    return 0;
+  }
+}
+
+/**
+ * Provides the control logic to determine the necessary action upon insertion.
+ *
+ * @param $node
+ *   The node being inserted.
+ */
+function category_menu_entity_inserted(&$node) {
+  // This boolean indicates whether or not the menu item settings for the
+  // given node allow a menu item to be inserted for it.
+  $do_insert = FALSE;
+  $menu_settings = NULL;
+
+  if (category_is_cat_or_cont($node->nid, TRUE)) {
+    $is_cat = !empty($node->cnid);
+    if (!$is_cat) {
+      category_menu_cont_update($node);
+      $menu_settings = category_menu_cont_load($node->nid, TRUE);
+      if ($menu_settings->item_for_cats && !$node->hidden_cont) {
+        $do_insert = TRUE;
+      }
+    }
+    else {
+      $menu_settings = category_menu_cont_load($node->cnid, TRUE);
+      if ($menu_settings->item_for_cats) {
+        $do_insert = TRUE;
+      }
+    }
+
+    if ($do_insert) {
+      $node->menu_settings = $menu_settings->item_for_cats;
+      if (empty($node->parents)) {
+        // Insert case 1(a): category / container with 0 parents
+        category_menu_save_item($node);
+      }
+      elseif (is_array($node->parents)) {
+        $parent = $node->parents[0];
+        $item_found = FALSE;
+        $reached_root = FALSE;
+        do {
+          $item = category_menu_get_mapping($parent, TRUE);
+          if ($item) {
+            $item_found = TRUE;
+          }
+          else {
+            $parents = category_get_parents($parent, 'cid', TRUE, TRUE);
+            if (!empty($parents)) {
+              $parent = reset($parents);
+              $parent = $parent->cid;
+            }
+            else {
+              $reached_root = TRUE;
+            }
+          }
+        } while (!($item_found || $reached_root));
+
+        // Insert cases 1(b) and 2: category / container with >= 1 parent
+        category_menu_save_item($node, $parent);
+      }
+
+      $assigned_nodes = category_select_nodes(array($node->nid));
+      while ($assigned_node = db_fetch_object($assigned_nodes)) {
+        $categories = category_node_get_categories($assigned_node->nid);
+        if (!empty($categories)) {
+          // Update special case (variation on cases 3 and 4): category with
+          // assigned nodes that are assigned to >= 1 category
+          $first_category = reset($categories);
+          $menu_settings = category_menu_cont_load($first_category->cnid, TRUE);
+          $assigned_node->menu_settings = $menu_settings->item_for_nodes;
+          category_menu_save_item($assigned_node, $first_category->cid);
+        }
+      }
+    }
+  }
+
+  $categories = category_node_get_categories($node->nid, 'cid', TRUE);
+  if (!$do_insert && !empty($categories)) {
+    do {
+      // Insert cases 3 and 4: node tagged with >= 1 category from >= 1
+      // container
+      $first_category = reset($categories);
+      $menu_settings = category_menu_cont_load($first_category->cnid);
+      if ($menu_settings->item_for_nodes) {
+        $do_insert = TRUE;
+        $node->menu_settings = $menu_settings->item_for_nodes;
+        category_menu_save_item($node, $first_category->cid);
+      }
+      array_shift($categories);
+
+    } while (!$do_insert && (count($categories) > 0));
+  }
+}
+
+/**
+ * Provides the control logic to determine the necessary action upon updating.
+ *
+ * @param $node
+ *   The node being updated.
+ */
+function category_menu_entity_updated(&$node) {
+  // This boolean indicates whether or not the menu item settings for the
+  // given node allow a menu item to be inserted / updated for it.
+  $do_insert = FALSE;
+  $menu_settings = NULL;
+
+  if (category_is_cat_or_cont($node->nid)) {
+    $is_cat = !empty($node->cnid);
+    if (!$is_cat) {
+      category_menu_cont_update($node);
+
+      $menu_settings = category_menu_cont_load($node->nid, TRUE);
+      if ($menu_settings->item_for_cats) {
+        if (!$node->hidden_cont) {
+          $do_insert = TRUE;
+        }
+        else {
+          $children = category_get_children($node->nid);
+          foreach ($children as $child) {
+            $node_item = node_load($child->cid);
+            if (is_array($node_item->parents) && !empty($node_item->parents)) {
+              foreach($node_item->parents as $p) {
+                if($p == $node->nid) {
+                  category_menu_save_item($node_item);
+                }
+              }
+            }
+          }
+
+          category_menu_delete_item($node);
+        }
+      }
+    }
+    else {
+      $menu_settings = category_menu_cont_load($node->cnid, TRUE);
+      if ($menu_settings->item_for_cats) {
+        $do_insert = TRUE;
+      }
+    }
+
+    if ($do_insert) {
+      $node->menu_settings = $menu_settings->item_for_cats;
+      if (empty($node->parents)) {
+        // Update case 1(a): category / container with 0 parents
+        category_menu_save_item($node);
+      }
+      elseif (is_array($node->parents)) {
+        $parent = $node->parents[0];
+        $item_found = FALSE;
+        $reached_root = FALSE;
+        do {
+          $item = category_menu_get_mapping($parent, TRUE);
+          if ($item) {
+            $item_found = TRUE;
+          }
+          else {
+            $parents = category_get_parents($parent, 'cid', TRUE, TRUE);
+            if (!empty($parents)) {
+              $parent = reset($parents);
+              $parent = $parent->cid;
+            }
+            else {
+              $reached_root = TRUE;
+            }
+          }
+        } while (!($item_found || $reached_root));
+
+        // Update cases 1(b) and 2: category / container with >= 1 parent
+        category_menu_save_item($node, $parent);
+      }
+
+      $assigned_nodes = category_select_nodes(array($node->nid));
+      while ($assigned_node = db_fetch_object($assigned_nodes)) {
+        $categories = category_node_get_categories($assigned_node->nid);
+        if (!empty($categories)) {
+          // Update special case (variation on cases 3 and 4): category with
+          // assigned nodes that are assigned to >= 1 category
+          $first_category = reset($categories);
+          $menu_settings = category_menu_cont_load($first_category->cnid, TRUE);
+          if (!empty($menu_settings->item_for_nodes)) {
+            $assigned_node->menu_settings = $menu_settings->item_for_nodes;
+            category_menu_save_item($assigned_node, $first_category->cid);
+          }
+        }
+      }
+
+      $category_multiple_parents = ($node->cnid && $node->hierarchy == 2);
+      $container_multiple_parents = (!$node->cnid && variable_get('category_distant_containers', 1) == 2);
+      if ($category_multiple_parents || $container_multiple_parents) {
+        // Update special case: category / container where children have >1 parent
+        $children = category_get_children($node->nid);
+        foreach ($children as $child) {
+          $node_item = node_load($child->cid);
+          if (is_array($node_item->parents) && !empty($node_item->parents)) {
+            category_menu_save_item($node_item, $node_item->parents[0]);
+          }
+        }
+      }
+    }
+  }
+
+  $categories = category_node_get_categories($node->nid, 'cid', TRUE);
+  $clear_menu_item = FALSE;
+
+  if (!$do_insert && !empty($categories)) {
+    do {
+      // Update cases 3 and 4: node tagged with >= 1 category from >= 1
+      // container
+      $first_category = reset($categories);
+      $menu_settings = category_menu_cont_load($first_category->cnid);
+      if ($menu_settings->item_for_nodes) {
+        $do_insert = TRUE;
+        $node->menu_settings = $menu_settings->item_for_nodes;
+        category_menu_save_item($node, $first_category->cid);
+      }
+      array_shift($categories);
+
+    } while (!$do_insert && (count($categories) > 0));
+
+    if (!$do_insert) {
+      $clear_menu_item = TRUE;
+    }
+  }
+  elseif (!$do_insert) {
+    $clear_menu_item = TRUE;
+  }
+
+  if ($clear_menu_item) {
+    // Update special case: node tagged with no categories
+    $mid = category_menu_get_mapping($node->nid);
+    if ($mid) {
+      category_menu_delete_item($node);
+    }
+  }
+}
+
+/**
+ * Responds to the update of an existing container, by updating the container's
+ * menu settings in the database.
+ *
+ * @param $node
+ *   The container node being updated.
+ */
+function category_menu_cont_update($node) {
+  $node->cid = $node->nid;
+  $fields = array(
+    'cid',
+    'item_for_cats',
+    'item_for_nodes',
+  );
+
+  $data_exists = (db_num_rows(db_query('SELECT * FROM {category_menu} WHERE cid = %d', $node->nid)) > 0);
+  if ($data_exists) {
+    db_query('UPDATE {category_menu} SET '. _category_container_update($node, $fields) .' WHERE cid = %d', $node->nid);
+  }
+  else {
+    db_query('INSERT INTO {category_menu} '. _category_container_insert($node, 1, $fields) .' VALUES '. _category_container_insert($node, 2, $fields));
+  }
+}
+
+/**
+ * Provides the control logic to determine the necessary action upon deleting.
+ *
+ * @param $node
+ *   The node being deleted.
+ */
+function category_menu_entity_deleted(&$node, $is_cat_or_cont = NULL) {
+  $do_insert = FALSE;
+
+  if ((isset($is_cat_or_cont) && $is_cat_or_cont) || category_is_cat_or_cont($node->nid)) {
+    $mid = category_menu_get_mapping($node->nid);
+
+    $assigned_nodes = category_select_nodes_cache($node->nid);
+    foreach ($assigned_nodes as $assigned_node) {
+      $categories = category_node_get_categories($assigned_node->nid);
+      if (!empty($categories)) {
+        do {
+          // Delete case 3: category with >= 1 node, node has >= 1 other
+          // category
+          $first_category = reset($categories);
+          $menu_settings = category_menu_cont_load($first_category->cnid);
+          if ($menu_settings->item_for_nodes) {
+            $do_insert = TRUE;
+            $assigned_node->menu_settings = $menu_settings->item_for_nodes;
+            category_menu_save_item($assigned_node, $first_category->cid);
+          }
+          array_shift($categories);
+
+        } while (!$do_insert && (count($categories) > 0));
+      }
+      else {
+        $assigned_mid = category_menu_get_mapping($assigned_node->nid);
+        if ($assigned_mid) {
+          $item = menu_get_item($assigned_mid);
+          if (isset($item['pid']) && $item['pid'] == $mid) {
+            // Delete cases 2 and 3: category with >= 1 node
+            category_menu_delete_item($assigned_node);
+          }
+        }
+      }
+    }
+
+    // Delete Case 5: category / container with >= 1 child
+    $children = category_get_children($node->nid);
+    foreach ($children as $child) {
+      $node_item = node_load($child->cid);
+      if (is_array($node_item->parents) && !empty($node_item->parents) && $node_item->parents[0] == $node->nid) {
+        category_menu_save_item($node_item);
+      }
+    }
+
+    // Delete cases 2-5: category / container is being deleted
+    category_menu_delete_item($node);
+
+    $is_cat = !empty($node->cnid);
+    if (!$is_cat) {
+      category_menu_cont_delete($node->nid);
+    }
+  }
+  else {
+    // Delete case 1: node tagged with >= 1 category
+    $mid = category_menu_get_mapping($node->nid);
+    if ($mid) {
+      category_menu_delete_item($node);
+    }
+  }
+}
+
+/**
+ * Responds to the delete of an existing container, by deleting the container's
+ * menu settings in the database.
+ *
+ * @param $nid
+ *   The node ID of the container being deleted.
+ */
+function category_menu_cont_delete($nid) {
+  db_query('DELETE FROM {category_menu} WHERE cid = %d', $nid);
+}
+
+/**
+ * Save the menu item for a node into the database.
+ *
+ * @param $node
+ *   The node object whose menu item is getting saved.
+ * @param $parent
+ *   The node ID of the parent node, whose menu item will become the parent
+ *   of the menu item for $node. If set to 0 (default), the default menu group
+ *   becomes the parent.
+ */
+function category_menu_save_item(&$node, $parent = 0) {
+  $mid = category_menu_get_mapping($node->nid, TRUE);
+  $item = menu_get_item($mid);
+
+  if (empty($item['path'])) {
+    $item['path'] = 'node/'. $node->nid;
+  }
+  $item['mid'] = $mid;
+
+  $pid = category_menu_get_mapping($parent);
+  $parent_path = 'node/'. $parent;
+  if ($pid) {
+    $item['pid'] = $pid;
+  }
+  else {
+    $item['pid'] = variable_get('category_menu_default_menu', 1);
+  }
+
+  $item['title'] = $node->title;
+  $item['description'] = $node->description ? $node->description : '';
+  $item['weight'] = $node->weight;
+  $item['type'] = MENU_CUSTOM_ITEM | MENU_MODIFIED_BY_ADMIN;
+
+  if (isset($node->menu_settings)) {
+    if ($node->menu_settings == 2) {
+      $item['type'] &= ~MENU_VISIBLE_IN_TREE;
+    }
+    if ($node->menu_settings == 3) {
+      $item['type'] |= MENU_EXPANDED;
+    }
+    else {
+      $item['type'] &= ~MENU_EXPANDED;
+    }
+  }
+
+  $status = menu_save_item($item);
+
+  if ($status == SAVED_NEW) {
+    category_menu_insert_mapping($node->nid, $item['mid']);
+  }
+
+  // This is only here to stop menu_otf from overriding updates
+  $node->menu = $item;
+
+  menu_rebuild();
+}
+
+/**
+ * Delete a menu item from the database. If $item['mid'] is specified, then
+ * this is used to find the existing item; otherwise, $node->nid is used to
+ * form a path, which is then searched for in the menu tree.
+ *
+ * @param $node
+ *   The node whose menu item is to be deleted.
+ * @param $mid
+ *   The ID of the menu item to be deleted. If not set to default (0), is
+ *   used to find the existing menu item.
+ */
+function category_menu_delete_item($node) {
+  $item = array();
+  $mid = category_menu_get_mapping($node->nid);
+
+  if ($mid) {
+    $item['mid'] = $mid;
+  }
+  else {
+    $item['path'] = 'node/'. $node->nid;
+  }
+
+  menu_delete_item($item);
+  category_menu_delete_mapping($node->nid);
+
+  menu_rebuild();
+}
+
+/**
+ * Inserts a category-to-menu-item mapping into the category_menu table.
+ * This mapping is needed because one page can have many menu items, and
+ * category_menu only ever wants to retrieve / update / delete one of them:
+ * the one that it created.
+ *
+ * @param $nid
+ *   The node ID of the category / container / assigned node being mapped.
+ * @param $mid
+ *   The menu ID of the menu item being mapped.
+ */
+function category_menu_insert_mapping($nid, $mid) {
+  db_query("INSERT INTO {category_menu_map} (nid, mid) VALUES (%d, %d)", $nid, $mid);
+}
+
+/**
+ * Deletes a category-to-menu-item mapping from the category_menu table.
+ *
+ * @param $nid
+ *   The node ID of the node mapping being deleted.
+ */
+function category_menu_delete_mapping($nid) {
+  db_query("DELETE FROM {category_menu_map} WHERE nid = %d", $nid);
+}
+
+/**
+ * Retrieves the menu ID of the menu item mapped to the specified node.
+ *
+ * @param $nid
+ *   The node ID of the node whose menu item will be retrieved.
+ *
+ * @return
+ *   The menu ID that corresponds to $nid in the mappings table, or 0 if no
+ *   mapping could be found.
+ */
+function category_menu_get_mapping($nid, $reset = FALSE) {
+  static $mappings;
+
+  // Grab all mappings in one query, and store in a simple cache
+  if (!isset($mappings) || $reset) {
+    $mappings = array();
+    $result = db_query("SELECT nid, mid FROM {category_menu_map}");
+    while ($mapping = db_fetch_object($result)) {
+      $mappings[$mapping->nid] = $mapping->mid;
+    }
+  }
+
+  if (isset($mappings[$nid])) {
+    return $mappings[$nid];
+  }
+  else {
+    return 0;
+  }
+}

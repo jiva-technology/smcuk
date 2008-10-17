@@ -1,0 +1,69 @@
+// $Id: INSTALL.txt,v 1.9 2006/04/14 11:40:21 jaza Exp $
+
+Requirements
+------------
+
+This module requires the latest development version of Drupal (CVS HEAD).
+
+
+Installation
+------------
+
+1. Copy the category folder and its contents to the Drupal modules/ directory.
+   Drupal should automatically detect it.
+
+2. Go to 'administer -> modules' and enable category (and category_menu,
+   category_display, category_export, and category_legacy, if applicable).
+   Note: for each module that you enable, all necessary database tables will
+   be automatically created, using Drupal's new .install file system. You no
+   longer need to run the category.mysql script (which is why this file no
+   longer exists).
+
+3. If you wish to use taxonomy-dependent Drupal modules (e.g. forum, image,
+   glossary) with this module, you must install the taxonomy wrapper module.
+   There is now a script available to perform this installation for you. To
+   run the script, go to 'administer -> settings -> category', and in the
+   'wrapper install / uninstall settings' box, click the 'install now' link
+   for the taxonomy wrapper. If you experience errors with this script (usually
+   due to file system permissions problems), see the instructions for
+   installing the wrapper modules manually (available online).
+
+4. If you wish to use book-dependent Drupal modules (e.g. export_dxml) with
+   this module, you must install the book wrapper module. The procedure for
+   doing this is similar to that for installing the taxonomy wrapper module.
+   To run the book wrapper installation script, go to 'administer -> settings
+   -> category', and in the 'wrapper install / uninstall settings' box, click
+   the 'install now' link for the book wrapper. If you experience errors with
+   this script (usually due to file system permissions problems), see the
+   instructions for installing the wrapper modules manually (available online).
+
+5. If you have existing taxonomy terms and vocabularies, or if you have
+   existing book nodes, you can import them as categories and containeris using
+   category_legacy. To do this, go to 'administer -> category legacy', and
+   follow the instructions on that page. It is recommended that you enable the
+   taxonomy and book wrappers before performing an import. Additionally, using
+   the taxonomy wrapper with existing taxonomy data is not recommended - either
+   import your existing taxonomy data first, disable the taxonomy wrapper, or
+   delete your site's taxonomy data. You are able to leave the book module
+   enabled, and continue to use your book data, if you wish (but as with
+   taxonomy, it is recommended that you disable book).
+
+6. Go to 'administer -> access control' to configure access privileges for
+   this module.
+
+7. Go to 'administer -> settings -> category' to change the settings for this
+   module. You might also want to change the node type settings for the
+   category and container node types, at 'administer -> settings -> content
+   types'.
+
+8. Go to 'administer -> categories' to start managing your categories and
+   containers. You can create new categories and containers from here, or
+   you can go to 'create content -> category' or 'create content -> container'.
+
+9. You can assign content to categories by configuring your containers to be
+   associated with various node types, and then creating or editing nodes of
+   those types.
+   Note: content with assigned categories will only have its categories
+   displayed if category_display is installed, and if your containers are
+   configured to show categories on assigned nodes, and if the taxonomy
+   wrapper is installed.

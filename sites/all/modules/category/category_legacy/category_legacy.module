@@ -1,0 +1,2002 @@
+<?php
+// $Id: category_legacy.module,v 1.28 2007/01/05 15:31:15 jaza Exp $
+
+/**
+ * @file
+ * Allows you to convert your taxonomy and book data into category data, and
+ * vice versa.
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function category_legacy_help($section) {
+  switch ($section) {
+    case 'admin/help#category_legacy':
+      return t('<p>The category legacy module lets you import vocabularies and terms from the taxonomy module, and books from the book module. These are then converted into containers and categories. You can also export containers and categories back to the taxonomy and book modules. It is strongly recommended that you back up all existing taxonomy and book data on your site, before performing any operations using this module.</p><p>This module requires the category module.</p>');
+    case 'admin/category/legacy':
+      $output = '<p>'. t('Select the vocabularies that you wish to import. Only vocabularies that do not already have equivalent containers are listed. A vocabulary is defined as legacy (and therefore appears on this list) only if no container can be found with the same ID, and with the same title.'). '</p>';
+      $output .= '<p>'. t('For each vocabulary that you select, the vocabulary and all its terms will be imported into the category system. Vocabularies will become containers, and terms will become categories. Vocabularies and terms have their own vocabulary and term IDs, whereas categories and containers use the more standard node IDs; therefore, in order to avoid any possible conflict in sequencing, everything that you import will be given a new node ID, and will lose its old vocabulary or term ID.'). '</p>';
+      $output .= '<p>'. t('<strong>Warning:</strong> all vocabularies and terms that you import will be deleted from the taxonomy database tables! If you have the taxonomy wrapper installed, then they will all be re-inserted, and will be untouched except for having new IDs, to match your newly imported categories and containers. If you have any doubts, you should enable the \'backup all selected data\' option before proceeding.'). '</p>';
+      return $output;
+    case 'admin/content/category/legacy/import/book':
+      $output = '<p>'. t('Select the books that you wish to import. Only books that do not already have equivalent containers are listed. A book is defined as legacy (and therefore appears on this list) only if no container can be found with the same ID, and with the same title.'). '</p>';
+      $output .= '<p>'. t('For each book that you select, the book and all its children will be imported into the category system. Root book pages will become containers, and all child pages will become categories. The node IDs for each book page will be preserved during the import, and will remain unchanged once the book pages are transformed into categories and containers.'). '</p>';
+      return $output;
+    case 'admin/content/category/legacy/export':
+      $output = '<p>'. t('Select the containers that you wish to export. Only containers that do not already have equivalent vocabularies are listed. A container is defined as legacy (and therefore appears on this list) only if no vocabulary can be found with the same ID, and with the same title.'). '</p>';
+      $output .= '<p>'. t('For each container that you select, the container and all its categories will be exported to the taxonomy system. Containers will become vocabularies, and categories will become terms. Vocabularies and terms have their own vocabulary and term IDs, whereas categories and containers use the more standard node IDs; therefore, in order to avoid any possible conflict in sequencing, everything that you export will be given a new vocabulary or term ID, and will lose its old node ID.'). '</p>';
+      $output .= '<p>'. t('<strong>Warning:</strong> all containers and categories that you export will be deleted from the category database tables! Additionally, because the category system holds more data fields than the taxonomy system, any fields that do not have an equivalent in the taxonomy system will be lost. If you have any doubts, you should enable the \'backup all selected data\' option before proceeding.'). '</p>';
+      return $output;
+    case 'admin/content/category/legacy/export/book':
+      $output = '<p>'. t('Select the containers that you wish to export. Only containers that do not already have equivalent books are listed. A container is defined as legacy (and therefore appears on this list) only if no book can be found with the same ID, and with the same title.'). '</p>';
+      $output .= '<p>'. t('For each container that you select, the container and all its categories will be exported to the book system. Containers will become root book pages, and all categories will become child pages. The node IDs for each container and category will be preserved during the export, and will remain unchanged once the categories and containers are transformed into book pages.'). '</p>';
+      $output .= '<p>'. t('<strong>Warning:</strong> because the category system holds more data fields than the book system, any fields that do not have an equivalent in the book system will be lost. If you have any doubts, you should enable the \'backup all selected data\' option before proceeding.'). '</p>';
+      return $output;
+  }
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function category_legacy_menu($may_cache) {
+  $items = array();
+
+  if ($may_cache) {
+    $items[] = array(
+      'path' => 'admin/content/category/legacy',
+      'title' => t('Category legacy'),
+      'access' => user_access('administer categories'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => array('category_legacy_import_taxonomy_form'),
+    );
+    $items[] = array(
+      'path' => 'admin/content/category/legacy/import',
+      'title' => t('Import'),
+      'access' => user_access('administer categories'),
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+      'weight' => -10,
+    );
+    $items[] = array(
+      'path' => 'admin/content/category/legacy/import/taxonomy',
+      'title' => t('Taxonomy'),
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+      'weight' => -10,
+    );
+    $items[] = array(
+      'path' => 'admin/content/category/legacy/import/book',
+      'title' => t('Book'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => array('category_legacy_import_book_form'),
+      'access' => user_access('administer categories'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => -6,
+    );
+    $items[] = array(
+      'path' => 'admin/content/category/legacy/export',
+      'title' => t('Export'),
+      'access' => user_access('administer categories'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => array('category_legacy_export_taxonomy_form'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => -6,
+    );
+    $items[] = array(
+      'path' => 'admin/content/category/legacy/export/taxonomy',
+      'title' => t('Taxonomy'),
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+      'weight' => -10,
+    );
+    $items[] = array(
+      'path' => 'admin/content/category/legacy/export/book',
+      'title' => t('Book'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => array('category_legacy_export_book_form'),
+      'access' => user_access('administer categories'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => -6,
+    );
+  }
+  else {
+    if (category_legacy_get_term_path_status()) {
+      $items[] = array(
+        'path' => 'taxonomy/term',
+        'title' => t('Taxonomy term'),
+        'callback' => 'category_legacy_term_page',
+        'access' => user_access('access content'),
+        'type' => MENU_CALLBACK,
+      );
+    }
+    if (category_legacy_get_cat_path_status()) {
+      $items += category_legacy_get_old_cat_paths();
+    }
+  }
+
+  return $items;
+}
+
+/**
+ * Implementation of hook_forms().
+ */
+function category_legacy_forms() {
+  $forms['category_legacy_import_book_form'] = array(
+    'callback' => 'category_legacy_import_form_build',
+    'callback arguments' => array('book'),
+  );
+  $forms['category_legacy_import_taxonomy_form'] = array(
+    'callback' => 'category_legacy_import_form_build',
+    'callback arguments' => array('taxonomy'),
+  );
+  $forms['category_legacy_export_book_form'] = array(
+    'callback' => 'category_legacy_export_form_build',
+    'callback arguments' => array('book'),
+  );
+  $forms['category_legacy_export_taxonomy_form'] = array(
+    'callback' => 'category_legacy_export_form_build',
+    'callback arguments' => array('taxonomy'),
+  );
+  return $forms;
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function category_legacy_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+  switch ($op) {
+    case 'delete':
+      if (category_is_cat_or_cont($node->nid)) {
+        $type = category_node_get_type($node);
+        $is_cat = $type == 'category_cat';
+        if ($is_cat) {
+          category_legacy_map_delete($node->nid);
+        }
+      }
+      break;
+  }
+}
+
+/**
+ * Invoke a hook_category_legacy() operation in all modules.
+ *
+ * @param $op
+ *   A string containing the name of the category_legacy operation.
+ * @param &$data
+ *   A nested array of taxonomy or book data. Can be changed by other modules.
+ * @param $edit
+ *   Optional array of form values.
+ * @param $legacy_map
+ *   Optional array of mappings from old to new IDs, in the form $old => $new.
+ *
+ * @return
+ *   The returned value of the invoked hooks.
+ */
+function category_legacy_invoke_all($op, &$data, $edit = NULL, $legacy_map = NULL) {
+  $return = array();
+  foreach (module_implements('category_legacy') as $name) {
+    $function = $name .'_category_legacy';
+    $result = $function($op, $data, $edit, $legacy_map);
+    if (isset($result) && is_array($result)) {
+      $return = array_merge($return, $result);
+    }
+    else if (isset($result)) {
+      $return[] = $result;
+    }
+  }
+  return $return;
+}
+
+/**
+ * Implementation of hook_category_legacy().
+ */
+function category_legacy_category_legacy($op, &$data, $edit = NULL, $legacy_map = NULL) {
+  switch ($op) {
+    case 'import_taxonomy_submit':
+      if ($edit['redirect_old_paths']) {
+        foreach ($legacy_map as $tid => $cid) {
+          db_query('INSERT INTO {category_legacy_map} (tbcid, id_type, redirect_id, redirect_type) VALUES (%d, \'taxonomy\', %d, \'category\')', $tid, $cid);
+        }
+
+        $messages = drupal_set_message();
+        if (!isset($messages['error'])) {
+          drupal_set_message(t('Redirected existing legacy paths.'));
+        }
+      }
+
+      if (module_exists('path')) {
+        if ($edit['change_old_aliases']) {
+          $paths = category_legacy_get_path_cache();
+          foreach ($paths as $path) {
+            if ($path->type == 'import_taxonomy_pages' || $path->type == 'import_taxonomy_feeds') {
+              $temp_array = explode('/', $path->src);
+              $tid = $temp_array[2];
+              if (isset($legacy_map[$tid])) {
+                if ($path->type == 'import_taxonomy_pages') {
+                  path_set_alias('node/'. $legacy_map[$tid], $path->dst, $path->pid);
+                }
+                else {
+                  path_set_alias('node/'. $legacy_map[$tid]. '/feed', $path->dst, $path->pid);
+                }
+              }
+            }
+          }
+
+          $messages = drupal_set_message();
+          if (!isset($messages['error'])) {
+            drupal_set_message(t('Changed existing legacy path aliases.'));
+          }
+        }
+      }
+
+      break;
+    case 'export_taxonomy_submit':
+      if ($edit['redirect_old_paths']) {
+        foreach ($legacy_map as $cid => $tid) {
+          db_query('INSERT INTO {category_legacy_map} (tbcid, id_type, redirect_id, redirect_type) VALUES (%d, \'category\', %d, \'taxonomy\')', $cid, $tid);
+        }
+
+        $messages = drupal_set_message();
+        if (!isset($messages['error'])) {
+          drupal_set_message(t('Redirected existing legacy paths.'));
+        }
+      }
+
+      if (module_exists('path')) {
+        if ($edit['change_old_aliases']) {
+          $paths = category_legacy_get_path_cache();
+          foreach ($paths as $path) {
+            if ($path->type == 'export_taxonomy_pages' || $path->type == 'export_taxonomy_feeds') {
+              $temp_array = explode('/', $path->src);
+              $cid = $temp_array[1];
+              if (isset($legacy_map[$cid])) {
+                if ($path->type == 'export_taxonomy_pages') {
+                  path_set_alias('taxonomy/term/'. $legacy_map[$cid], $path->dst, $path->pid);
+                }
+                else {
+                  path_set_alias('taxonomy/term/'. $legacy_map[$cid]. '/0/feed', $path->dst, $path->pid);
+                }
+              }
+            }
+          }
+
+          $messages = drupal_set_message();
+          if (!isset($messages['error'])) {
+            drupal_set_message(t('Changed existing legacy path aliases.'));
+          }
+        }
+      }
+
+      break;
+  }
+}
+
+/**
+ * Menu callback; displays the screen for importing taxonomy or book data.
+ */
+function category_legacy_import_form_build($import_type, $arg1 = 'import') {
+  $form = array();
+
+  if ($import_type == 'taxonomy') {
+    $vocabularies = category_legacy_get_old_vocabularies();
+    foreach ($vocabularies as $vid => $name) {
+      $form['vocabulary'][$vid] = array(
+        '#type' => 'checkbox',
+      );
+    }
+  }
+  else {
+    $books = category_legacy_get_old_books();
+    foreach ($books as $nid => $title) {
+      $form['books'][$nid] = array(
+        '#type' => 'checkbox',
+      );
+    }
+  }
+
+  if (isset($form['vocabulary']) || isset($form['books'])) {
+    if ($import_type == 'taxonomy') {
+      $form['vocabulary']['#tree'] = TRUE;
+
+      $options = array(
+        '1' => t('Enabled'),
+        '0' => t('Disabled'),
+      );
+      $form['category_legacy'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('General settings'),
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+      );
+
+      $desc_options = array(
+        '0' => t('Description field'),
+        '1' => t('Body field'),
+      );
+      $form['category_legacy']['description_target'] = array(
+        '#type' => 'radios',
+        '#title' => t('Import descriptions into'),
+        '#options' => $desc_options,
+        '#description' => t('Determines the field into which description text from vocabularies and terms will be imported. Because taxonomy terms cannot have body text (like nodes do), many users resort to treating the description field as a body field. If the description text in many of your terms is longer than one sentence, it is recommended that you import it as body text.'),
+        '#required' => TRUE,
+      );
+
+      $alias_paths = array(
+        '%taxonomy-path' => 'taxonomy/term/x',
+        '%category-path' => 'node/y',
+        '%taxonomy-rss' => 'taxonomy/term/x/0/feed',
+        '%category-rss' => 'node/y/feed',
+        '%taxonomy-query' => 'taxonomy/term/x+y',
+        '%category-query' => 'category/x+y',
+      );
+      $form['category_legacy']['redirect_old_paths'] = array(
+        '#type' => 'radios',
+        '#title' => t('Redirect existing legacy paths'),
+        '#options' => $options,
+        '#description' => t('Redirects all paths to taxonomy terms (such as %taxonomy-path, %taxonomy-rss, and %taxonomy-query) to their category equivalents (such as %category-path, %category-rss, and %category-query). The redirection only works if the taxonomy module is disabled, or is replaced with the taxonomy wrapper.', $alias_paths),
+        '#required' => TRUE,
+      );
+
+      if (module_exists('path')) {
+        $form['category_legacy']['change_old_aliases'] = array(
+          '#type' => 'radios',
+          '#title' => t('Change existing legacy path aliases'),
+          '#options' => $options,
+          '#description' => t('Searches for any existing aliases to taxonomy terms in the selected vocabularies (where aliases are in the form %taxonomy-path), and changes them to point to the new corresponding categories, in the form %category-path. Also changes aliases to taxonomy RSS feeds (where aliases are in the form %taxonomy-rss) to point to category RSS feeds, in the form %category-rss.', $alias_paths),
+          '#required' => TRUE,
+        );
+      }
+      $form['category_legacy']['backup_all_data'] = array(
+        '#type' => 'radios',
+        '#title' => t('Backup all selected data'),
+        '#options' => $options,
+        '#description' => t('Creates a backup copy of all selected vocabularies and their terms, before deleting them from the taxonomy database tables. These backups can be managed, and can be restored to their original state at any time.'),
+        '#required' => TRUE,
+      );
+    }
+    else {
+      $form['books']['#tree'] = TRUE;
+    }
+
+    // Allow other modules to add additional options to this form.
+    $form += category_get_form(FALSE, NULL, FALSE);
+    category_legacy_invoke_all('import_'. $import_type .'_form', $form);
+
+    $form['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Import'),
+    );
+  }
+
+  return $form;
+}
+
+/**
+ * Formats the taxonomy import form, with a table for the list of available
+ * vocabularies.
+ *
+ * @param $form
+ *   The form to be rendered.
+ *
+ * @return
+ *   A themed form for display.
+ */
+function theme_category_legacy_import_taxonomy_form($form) {
+  $output = '';
+  $vocabularies = category_legacy_get_old_vocabularies();
+
+  $header = category_legacy_get_old_vocabularies('header');
+  $result = category_legacy_get_old_vocabularies('result');
+  $rows = array();
+
+  while ($data = db_fetch_object($result)) {
+    $rows[] = array(drupal_render($form['vocabulary'][$data->vid]), $data->name, array('data' => $data->vid, 'align' => 'center'), array('data' => $data->tid_count, 'align' => 'center'));
+  }
+
+  if (empty($rows)) {
+    $rows[] = array(array('data' => t('No legacy vocabularies available.'), 'colspan' => '4'));
+  }
+
+  $output = theme('table', $header, $rows);
+  $output .= theme('pager', NULL, 50, 0);
+
+  if (!empty($vocabularies)) {
+    $output .= drupal_render($form);
+  }
+
+  return $output;
+}
+
+/**
+ * Formats the book import form, with a table for the list of available
+ * books.
+ *
+ * @param $form
+ *   The form to be rendered.
+ *
+ * @return
+ *   A themed form for display.
+ */
+function theme_category_legacy_import_book_form($form) {
+  $output = '';
+  $books = category_legacy_get_old_books();
+
+  $header = category_legacy_get_old_books('header');
+  $result = category_legacy_get_old_books('result');
+  $rows = array();
+
+  while ($data = db_fetch_object($result)) {
+    $rows[] = array(array('data' => drupal_render($form['books'][$data->nid]), 'align' => 'center'), $data->title, array('data' => $data->nid, 'align' => 'center'), array('data' => $data->child_count, 'align' => 'center'));
+  }
+
+  if (empty($rows)) {
+    $rows[] = array(array('data' => t('No legacy books available.'), 'colspan' => '4'));
+  }
+
+  $output = theme('table', $header, $rows);
+  $output .= theme('pager', NULL, 50, 0);
+
+  if (!empty($books)) {
+    $output .= drupal_render($form);
+  }
+
+  return $output;
+}
+
+function category_legacy_import_taxonomy_form_validate($form_id, $form_values) {
+  $vocabs_selected = FALSE;
+
+  if (isset($form_values['vocabulary']) && is_array($form_values['vocabulary'])) {
+    foreach ($form_values['vocabulary'] as $value) {
+      if ($value) {
+        $vocabs_selected = TRUE;
+        break;
+      }
+    }
+  }
+
+  if (!$vocabs_selected) {
+    form_set_error('vocabulary', t('You must select at least one vocabulary.'));
+  }
+}
+
+function category_legacy_import_book_form_validate($form_id, $form_values) {
+  $books_selected = FALSE;
+
+  if (isset($form_values['books']) && is_array($form_values['books'])) {
+    foreach ($form_values['books'] as $value) {
+      if ($value) {
+        $books_selected = TRUE;
+        break;
+      }
+    }
+  }
+
+  if (!$books_selected) {
+    form_set_error('vocabulary', t('You must select at least one book.'));
+  }
+}
+
+/**
+ * Control function for all actions that occur after the user submits the
+ * taxonomy import form.
+ */
+function category_legacy_import_taxonomy_form_submit($form_id, $form_values) {
+  $vocabularies = array();
+  $legacy_map = array();
+
+  // Build all taxonomy data in one big nested array
+  $vocabularies = category_legacy_build_vocab_tree($form_values['vocabulary']);
+
+  // Cache the path alias now, before any deletion occurs
+  if ($form_values['change_old_aliases']) {
+    category_legacy_get_path_cache(array('import_taxonomy_pages' => '/^taxonomy\/term\/\d+$/', 'import_taxonomy_feeds' => '/^taxonomy\/term\/\d+\/0\/feed$/'));
+  }
+
+  foreach ($vocabularies as $vid => $vocab) {
+    // Serialize and save to DB
+    if ($form_values['backup_all_data']) {
+      $data = serialize($vocab);
+      db_query("INSERT INTO {category_legacy} (tbcid, id_type, data) VALUES (%d, 'taxonomy', '%s')", $vid, $data);
+    }
+
+    // Delete old taxonomy data
+    category_legacy_del_vocabulary($vid);
+  }
+
+  $messages = drupal_set_message();
+  if (!isset($messages['error'])) {
+    if ($form_values['backup_all_data']) {
+      drupal_set_message(t('Backed up selected data.'));
+    }
+    drupal_set_message(t('Deleted data from taxonomy tables.'));
+  }
+
+  // Append additional fields to the vocab tree.
+  category_legacy_invoke_all('import_taxonomy_prepare', $vocabularies, $form_values);
+
+  // Transform into category data and save to database.
+  foreach ($vocabularies as $vid => $vocab) {
+    $node = category_legacy_build_container_from_vocab($vocab);
+    node_save($node);
+    $cnid = $node->nid;
+    $parent_map = array();
+
+    foreach ($vocab['terms'] as $tid => $term) {
+      $node = category_legacy_build_category_from_term($term, $cnid, $parent_map);
+      node_save($node);
+      $parent_map[$tid] = $node->nid;
+    }
+
+    // Append $parent_map to $legacy_map (array_merge() not used, as it
+    // destroys all the keys and re-indexes).
+    $legacy_map += $parent_map;
+  }
+
+  $messages = drupal_set_message();
+  if (!isset($messages['error'])) {
+    drupal_set_message(t('Inserted new category data.'));
+
+    if (category_get_wrapper_status('taxonomy', TRUE)) {
+      drupal_set_message(t('Legacy data re-generated by taxonomy wrapper.'));
+    }
+    if (category_get_wrapper_status('book', TRUE)) {
+      drupal_set_message(t('Legacy data re-generated by book wrapper.'));
+    }
+  }
+
+  // Perform additional post-import operations.
+  category_legacy_invoke_all('import_taxonomy_submit', $vocabularies, $form_values, $legacy_map);
+
+  $messages = drupal_set_message();
+  if (!isset($messages['error'])) {
+    return $_GET['q'];
+  }
+}
+
+/**
+ * Control function for all actions that occur after the user submits the
+ * book import form.
+ */
+function category_legacy_import_book_form_submit($form_id, $form_values) {
+  $books = array();
+
+  // Build all book data in one big nested array
+  $books = category_legacy_build_book_tree($form_values['books']);
+
+  // Append additional fields to the book tree.
+  category_legacy_invoke_all('import_book_prepare', $books, $form_values);
+
+  // Transform into category data and save to database.
+  foreach ($books as $nid => $book) {
+    $node = category_legacy_build_container_from_book($book);
+    node_save($node);
+
+    foreach ($book['children'] as $child_nid => $child) {
+      $node = category_legacy_build_category_from_book($child, $nid);
+      node_save($node);
+    }
+  }
+
+  $messages = drupal_set_message();
+  if (!isset($messages['error'])) {
+    drupal_set_message(t('Inserted new category data.'));
+
+    if (category_get_wrapper_status('taxonomy', TRUE)) {
+      drupal_set_message(t('Legacy data re-generated by taxonomy wrapper.'));
+    }
+    if (category_get_wrapper_status('book', TRUE)) {
+      drupal_set_message(t('Legacy data re-generated by book wrapper.'));
+    }
+  }
+
+  // Perform additional post-import operations.
+  category_legacy_invoke_all('import_book_submit', $books, $form_values);
+
+  $messages = drupal_set_message();
+  if (!isset($messages['error'])) {
+    return $_GET['q'];
+  }
+}
+
+/**
+ * Menu callback; displays the screen for exporting category data to taxonomy or book.
+ */
+function category_legacy_export_form_build($export_type) {
+  $form = array();
+
+  $categories = category_legacy_get_old_containers($export_type);
+  foreach ($categories as $cid => $title) {
+    $form['categories'][$cid] = array(
+      '#type' => 'checkbox',
+    );
+  }
+
+  if (isset($form['categories'])) {
+    if ($export_type == 'taxonomy') {
+      $options = array(
+        '1' => t('Enabled'),
+        '0' => t('Disabled'),
+      );
+      $form['category_legacy'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('General settings'),
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+      );
+
+      $desc_options = array(
+        '0' => t('Description field'),
+        '1' => t('Body field'),
+      );
+      $form['category_legacy']['description_target'] = array(
+        '#type' => 'radios',
+        '#title' => t('Get descriptions from'),
+        '#options' => $desc_options,
+        '#description' => t('Determines the field from which description text will be exported to vocabularies and terms from the category system. Categories have body text and description text, but taxonomy data has only description text. Therefore, it is impossible to export both of these fields: you must choose one of them.'),
+        '#required' => TRUE,
+      );
+
+      if (module_exists('path')) {
+        $alias_paths = array(
+          '%taxonomy-path' => 'taxonomy/term/x',
+          '%category-path' => 'node/y',
+          '%taxonomy-rss' => 'taxonomy/term/x/0/feed',
+          '%category-rss' => 'node/y/feed',
+          '%taxonomy-query' => 'taxonomy/term/x+y',
+          '%category-query' => 'category/x+y',
+        );
+        $form['category_legacy']['redirect_old_paths'] = array(
+          '#type' => 'radios',
+          '#title' => t('Redirect existing category paths'),
+          '#options' => $options,
+          '#description' => t('Redirects all paths to category nodes (such as %category-path, %category-rss, and %category-query) to their taxonomy equivalents (such as %taxonomy-path, %taxonomy-rss, and %taxonomy-query). The redirection only works if the category_legacy module remains enabled.', $alias_paths),
+          '#required' => TRUE,
+        );
+        $form['category_legacy']['change_old_aliases'] = array(
+          '#type' => 'radios',
+          '#title' => t('Change existing category path aliases'),
+          '#options' => $options,
+          '#description' => t('Searches for any existing aliases to category nodes in the selected containers (where aliases are in the form %category-path), and changes them to point to the new corresponding taxonomy terms, in the form %taxonomy-path. Also changes aliases to category RSS feeds (where aliases are in the form %category-rss) to point to taxonomy RSS feeds, in the form %taxonomy-rss.', $alias_paths),
+          '#required' => TRUE,
+        );
+      }
+      $form['category_legacy']['backup_all_data'] = array(
+        '#type' => 'radios',
+        '#title' => t('Backup all selected data'),
+        '#options' => $options,
+        '#description' => t('Creates a backup copy of all selected containers and their categories, before deleting them from the category and node database tables. These backups can be managed, and can be restored to their original state at any time.'),
+        '#required' => TRUE,
+      );
+    }
+    $form['categories']['#tree'] = TRUE;
+
+    // Allow other modules to add additional options to this form.
+    $null = NULL;
+    $extra = category_legacy_invoke_all('export_'. $export_type .'_form', $null);
+    if (is_array($extra)) {
+      foreach ($extra as $key => $value) {
+        if (is_array($value)) {
+          $form[$key] = $value;
+        }
+      }
+    }
+
+    $form['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Export'),
+    );
+  }
+
+  return $form;
+}
+
+/**
+ * Formats the taxonomy export form, with a table for the list of available
+ * containers.
+ *
+ * @param $form
+ *   The form to be rendered.
+ *
+ * @return
+ *   A themed form for display.
+ */
+function theme_category_legacy_export_taxonomy_form($form) {
+  $output = '';
+  $containers = category_legacy_get_old_containers('taxonomy');
+
+  $header = category_legacy_get_old_containers('taxonomy', 'header');
+  $result = category_legacy_get_old_containers('taxonomy', 'result');
+  $rows = array();
+
+  while ($data = db_fetch_object($result)) {
+    $rows[] = array(array('data' => drupal_render($form['categories'][$data->nid]), 'align' => 'center'), $data->title, array('data' => $data->nid, 'align' => 'center'), array('data' => $data->cid_count, 'align' => 'center'));
+  }
+
+  if (empty($rows)) {
+    $rows[] = array(array('data' => t('No legacy containers available.'), 'colspan' => '4'));
+  }
+
+  $output = theme('table', $header, $rows);
+  $output .= theme('pager', NULL, 50, 0);
+
+  if (!empty($containers)) {
+    $output .= drupal_render($form);
+  }
+
+  return $output;
+}
+
+/**
+ * Formats the book export form, with a table for the list of available
+ * containers.
+ *
+ * @param $form
+ *   The form to be rendered.
+ *
+ * @return
+ *   A themed form for display.
+ */
+function theme_category_legacy_export_book_form($form) {
+  $output = '';
+  $containers = category_legacy_get_old_containers('book');
+
+  $header = category_legacy_get_old_containers('book', 'header');
+  $result = category_legacy_get_old_containers('book', 'result');
+  $rows = array();
+
+  while ($data = db_fetch_object($result)) {
+    $rows[] = array(array('data' => drupal_render($form['categories'][$data->nid]), 'align' => 'center'), $data->title, array('data' => $data->nid, 'align' => 'center'), array('data' => $data->cid_count, 'align' => 'center'));
+  }
+
+  if (empty($rows)) {
+    $rows[] = array(array('data' => t('No legacy containers available.'), 'colspan' => '4'));
+  }
+
+  $output = theme('table', $header, $rows);
+  $output .= theme('pager', NULL, 50, 0);
+
+  if (!empty($containers)) {
+    $output .= drupal_render($form);
+  }
+
+  return $output;
+}
+
+function category_legacy_export_taxonomy_form_validate($form_id, $form_values) {
+  $containers_selected = FALSE;
+
+  if (isset($form_values['categories']) && is_array($form_values['categories'])) {
+    foreach ($form_values['categories'] as $value) {
+      if ($value) {
+        $containers_selected = TRUE;
+        break;
+      }
+    }
+  }
+
+  if (!$containers_selected) {
+    form_set_error('categories', t('You must select at least one container.'));
+  }
+}
+
+function category_legacy_export_book_form_validate($form_id, $form_values) {
+  $containers_selected = FALSE;
+
+  if (isset($form_values['categories']) && is_array($form_values['categories'])) {
+    foreach ($form_values['categories'] as $value) {
+      if ($value) {
+        $containers_selected = TRUE;
+        break;
+      }
+    }
+  }
+
+  if (!$containers_selected) {
+    form_set_error('categories', t('You must select at least one container.'));
+  }
+}
+
+/**
+ * Control function for all actions that occur after the user submits the
+ * taxonomy export form.
+ */
+function category_legacy_export_taxonomy_form_submit($form_id, $form_values) {
+  $containers = array();
+  $legacy_map = array();
+
+  // Build all taxonomy data in one big nested array
+  $containers = category_legacy_build_container_tree($form_values['categories']);
+
+  // Cache the path alias now, before any deletion occurs
+  if ($form_values['change_old_aliases']) {
+    category_legacy_get_path_cache(array('export_taxonomy_pages' => '/^node\/\d+$/', 'export_taxonomy_feeds' => '/^node\/\d+\/feed$/'));
+  }
+
+  foreach ($containers as $cnid => $cont) {
+    // Serialize and save to DB
+    if ($form_values['backup_all_data']) {
+      $data = serialize($cont);
+      db_query("INSERT INTO {category_legacy} (tbcid, id_type, data) VALUES (%d, 'category', '%s')", $cnid, $data);
+    }
+
+    // Delete old category data
+    category_del_container($cnid);
+  }
+
+  $messages = drupal_set_message();
+  if (!isset($messages['error'])) {
+    if ($form_values['backup_all_data']) {
+      drupal_set_message(t('Backed up selected data.'));
+    }
+    drupal_set_message(t('Deleted data from category tables.'));
+  }
+
+  // Append additional fields to the container tree.
+  category_legacy_invoke_all('export_taxonomy_prepare', $containers, $form_values);
+
+  // Transform into taxonomy data and save to database.
+  foreach ($containers as $cnid => $cont) {
+    $vocab = category_legacy_build_vocab_from_container($cont);
+    category_legacy_save_vocabulary($vocab);
+    $vid = $vocab['vid'];
+    $parent_map = array();
+
+    foreach ($cont['cats'] as $cid => $node) {
+      $term = category_legacy_build_term_from_category($node, $vid, $parent_map);
+      category_legacy_save_term($term);
+      $parent_map[$cid] = $term['tid'];
+    }
+
+    // Append $parent_map to $legacy_map (array_merge() not used, as it
+    // destroys all the keys and re-indexes).
+    $legacy_map += $parent_map;
+  }
+
+  $messages = drupal_set_message();
+  if (!isset($messages['error'])) {
+    drupal_set_message(t('Inserted new taxonomy data.'));
+  }
+
+  // Perform additional post-export operations.
+  category_legacy_invoke_all('export_taxonomy_submit', $containers, $form_values, $legacy_map);
+
+  $messages = drupal_set_message();
+  if (!isset($messages['error'])) {
+    return $_GET['q'];
+  }
+}
+
+/**
+ * Control function for all actions that occur after the user submits the
+ * book export form.
+ */
+function category_legacy_export_book_form_submit($form_id, $form_values) {
+  $containers = array();
+
+  // Build all category data in one big nested array
+  $containers = category_legacy_build_container_tree($form_values['categories']);
+
+  // Append additional fields to the category tree.
+  category_legacy_invoke_all('export_book_prepare', $containers, $form_values);
+
+  // Transform into book data and save to database.
+  foreach ($containers as $cnid => $cont) {
+    $node = category_legacy_build_book_from_container($cont);
+    node_save($node);
+    category_legacy_book_insert($node);
+
+    foreach ($cont['cats'] as $cid => $child) {
+      $node = category_legacy_build_book_from_category($child, $cnid);
+      node_save($node);
+      category_legacy_book_insert($node);
+    }
+  }
+
+  $messages = drupal_set_message();
+  if (!isset($messages['error'])) {
+    drupal_set_message(t('Inserted new book data.'));
+  }
+
+  // Perform additional post-export operations.
+  category_legacy_invoke_all('export_book_submit', $containers, $form_values);
+
+  $messages = drupal_set_message();
+  if (!isset($messages['error'])) {
+    return $_GET['q'];
+  }
+}
+
+/**
+ * Finds all vocabularies that do not have equivalent containers. Such
+ * vocabularies are ones where no container with the same ID and the same
+ * title can be found.
+ *
+ * @param $return_item
+ *   What to return. Default (NULL) returns an array of all vocabularies
+ *   found; 'header' returns the header array used to build a sortable,
+ *   pageable table of vocabularies; and 'result' returns a paged database
+ *   result resource of the vocabularies.
+ *
+ * @return
+ *   An array of vocabularies, in the form $vid => $name. Return value will
+ *   differ from this if $return_item is set.
+ */
+function category_legacy_get_old_vocabularies($return_item = NULL) {
+  static $header, $sql, $vocabularies;
+
+  if (!isset($header)) {
+    $header = array(
+      theme('table_select_header_cell'),
+      array('data' => t('Title'), 'field' => 'name', 'sort' => 'asc'),
+      array('data' => t('VID'), 'field' => 'vid'),
+      array('data' => t('No. of terms'), 'field' => 'tid_count'),
+    );
+  }
+
+  if ($return_item == 'header') {
+    return $header;
+  }
+
+  if (!isset($sql)) {
+    $sql = 'SELECT v.vid, v.name, COUNT(t.tid) AS tid_count FROM {vocabulary} v INNER JOIN {term_data} t ON v.vid = t.vid LEFT JOIN {category_cont} cn ON v.vid = cn.cid LEFT JOIN {node} n ON (cn.cid = n.nid AND v.name = n.title) WHERE n.nid IS NULL GROUP BY v.vid, v.name';
+    $sql .= tablesort_sql($header);
+  }
+
+  if ($return_item == 'result') {
+    return pager_query($sql, 50);
+  }
+
+  if (!isset($vocabularies)) {
+    $vocabularies = array();
+    $result = pager_query($sql, 50);
+
+    while ($data = db_fetch_object($result)) {
+      $vocabularies[$data->vid] = $data->name;
+    }
+  }
+
+  return $vocabularies;
+}
+
+/**
+ * Finds all vocabularies that do not have equivalent containers. Such
+ * vocabularies are ones where no container with the same ID and the same
+ * title can be found.
+ *
+ * @param $return_item
+ *   What to return. Default (NULL) returns an array of all vocabularies
+ *   found; 'header' returns the header array used to build a sortable,
+ *   pageable table of vocabularies; and 'result' returns a paged database
+ *   result resource of the vocabularies.
+ *
+ * @return
+ *   An array of vocabularies, in the form $vid => $name. Return value will
+ *   differ from this if $return_item is set.
+ */
+function category_legacy_get_old_books($return_item = NULL) {
+  static $header, $sql, $books;
+
+  if (!isset($header)) {
+    $header = array(
+      theme('table_select_header_cell'),
+      array('data' => t('Title'), 'field' => 'title', 'sort' => 'asc'),
+      array('data' => t('NID'), 'field' => 'nid'),
+      array('data' => t('Direct children'), 'field' => 'child_count'),
+    );
+  }
+
+  if ($return_item == 'header') {
+    return $header;
+  }
+
+  if (!isset($sql)) {
+    $sql = 'SELECT n.nid, n.title, COUNT(n2.nid) AS child_count FROM {node} n INNER JOIN {book} b ON n.vid = b.vid LEFT JOIN {book} b2 ON n.nid = b2.parent LEFT JOIN {node} n2 ON b2.vid = n2.vid LEFT JOIN {category} c ON n.nid = c.cid LEFT JOIN {node} n3 ON c.cid = n3.nid AND n.title = n3.title WHERE b.parent = 0 AND c.cid IS NULL AND n3.nid IS NULL GROUP BY n.nid, n.title';
+    $sql .= tablesort_sql($header);
+  }
+
+  if ($return_item == 'result') {
+    return pager_query($sql, 50);
+  }
+
+  if (!isset($books)) {
+    $books = array();
+    $result = pager_query($sql, 50);
+
+    while ($data = db_fetch_object($result)) {
+      $books[$data->nid] = $data->title;
+    }
+  }
+
+  return $books;
+}
+
+/**
+ * Finds all containers that do not have equivalent vocabularies or books. Such
+ * containers are ones where no vocabulary or book with the same ID and the
+ * same title can be found.
+ *
+ * @param $type
+ *   Whether to search for containers without equivalent vocabularies
+ *   ('taxonomy'), or to search for containers without equivalent books
+ *   ('book). Default is 'taxonomy'.
+ * @param $return_item
+ *   What to return. Default (NULL) returns an array of all containers
+ *   found; 'header' returns the header array used to build a sortable,
+ *   pageable table of containers; and 'result' returns a paged database
+ *   result resource of the containers.
+ *
+ * @return
+ *   An array of containers, in the form $cid => $title. Return value will
+ *   differ from this if $return_item is set.
+ */
+function category_legacy_get_old_containers($type = 'taxonomy', $return_item = NULL) {
+  static $header, $tax_sql, $book_sql, $vocabularies, $books;
+
+  if (!isset($header)) {
+    $header = array(
+      theme('table_select_header_cell'),
+      array('data' => t('Title'), 'field' => 'title', 'sort' => 'asc'),
+      array('data' => t('NID'), 'field' => 'nid'),
+      array('data' => t('No. of categories'), 'field' => 'cid_count'),
+    );
+  }
+
+  if ($return_item == 'header') {
+    return $header;
+  }
+
+  if ($type == 'taxonomy') {
+    if (!isset($tax_sql)) {
+      $tax_sql = 'SELECT n.nid, n.title, COUNT(c2.cid) AS cid_count FROM {node} n INNER JOIN {category} c ON n.nid = c.cid LEFT JOIN {category} c2 ON c.cid = c2.cnid LEFT JOIN {vocabulary} v ON (n.nid = v.vid AND n.title = v.name) WHERE c.cnid = 0 AND v.vid IS NULL GROUP BY n.nid, n.title';
+      $tax_sql .= tablesort_sql($header);
+    }
+  }
+  else {
+    if (!isset($book_sql)) {
+      $book_sql = 'SELECT n.nid, n.title, COUNT(c2.cid) AS cid_count FROM {node} n INNER JOIN {category} c ON n.nid = c.cid LEFT JOIN {category} c2 ON c.cid = c2.cnid LEFT JOIN {book} b ON n.vid = b.vid LEFT JOIN {node} n2 ON (b.vid = n2.vid AND n.title = n2.title) WHERE c.cnid = 0 AND b.vid IS NULL AND n2.vid IS NULL GROUP BY n.nid, n.title';
+      $book_sql .= tablesort_sql($header);
+    }
+  }
+
+  if ($return_item == 'result') {
+    return pager_query(($type == 'taxonomy' ? $tax_sql : $book_sql), 50);
+  }
+
+  if ($type == 'taxonomy') {
+    if (!isset($vocabularies)) {
+      $vocabularies = array();
+      $result = pager_query($tax_sql, 50);
+
+      while ($data = db_fetch_object($result)) {
+        $vocabularies[$data->nid] = $data->title;
+      }
+    }
+
+    return $vocabularies;
+  }
+  else {
+    if (!isset($books)) {
+      $books = array();
+      $result = pager_query($book_sql, 50);
+
+      while ($data = db_fetch_object($result)) {
+        $books[$data->nid] = $data->title;
+      }
+    }
+
+    return $books;
+  }
+}
+
+/**
+ * Build a tree of vocabularies and all their terms, suitable for serializing
+ * and for manipulating in other ways.
+ *
+ * @param $vocabs
+ *   An array of vocabularies to build, in the form $vid => $value (where
+ *   $value is a boolean indicating whether or not to include the vocab).
+ *
+ * @return
+ *   A nested array of vocabularies and terms.
+ */
+function category_legacy_build_vocab_tree($vocabs) {
+  $vocabularies = array();
+  $all_vocabs = category_legacy_get_vocabularies();
+
+  foreach ($vocabs as $vid => $value) {
+    if ($value) {
+      $vocabularies[$vid] = (array) $all_vocabs[$vid];
+      unset($vocabularies[$vid]['vid']);
+      if (empty($vocabularies[$vid]['nodes'][0])) {
+        unset($vocabularies[$vid]['nodes'][0]);
+      }
+
+      $terms = category_legacy_get_tree($vid);
+      $vocabularies[$vid]['terms'] = array();
+      if (!empty($terms) && is_array($terms)) {
+        foreach ($terms as $term) {
+          $tid = $term->tid;
+          if (isset($vocabularies[$vid]['terms'][$tid])) {
+            unset($vocabularies[$vid]['terms'][$tid]);
+          }
+          $vocabularies[$vid]['terms'][$tid] = (array) $term;
+          unset($vocabularies[$vid]['terms'][$tid]['tid']);
+          unset($vocabularies[$vid]['terms'][$tid]['depth']);
+          $vocabularies[$vid]['terms'][$tid]['relations'] = array_keys(category_legacy_get_related($tid));
+          $vocabularies[$vid]['terms'][$tid]['synonyms'] = category_legacy_get_synonyms($tid);
+          $vocabularies[$vid]['terms'][$tid]['category']['legacy'] = category_legacy_get_nodes($tid);
+        }
+      }
+    }
+  }
+
+  return $vocabularies;
+}
+
+/**
+ * Build a tree of books and all their child nodes, suitable for serializing
+ * and for manipulating in other ways.
+ *
+ * @param $books
+ *   An array of books to build, in the form $nid => $value (where
+ *   $value is a boolean indicating whether or not to include the book).
+ *
+ * @return
+ *   A nested array of books and their child nodes.
+ */
+function category_legacy_build_book_tree($top_books) {
+  $books = array();
+  $all_books = category_legacy_get_books();
+
+  foreach ($top_books as $nid => $value) {
+    if ($value) {
+      $books[$nid] = (array) $all_books[$nid];
+
+      $children = category_legacy_get_book_tree($nid);
+      $books[$nid]['children'] = array();
+      if (!empty($children) && is_array($children)) {
+        foreach ($children as $child) {
+          $child_nid = $child->nid;
+          $books[$nid]['children'][$child_nid] = (array) $child;
+        }
+      }
+    }
+  }
+
+  return $books;
+}
+
+/**
+ * Build a tree of containers and all their categories, suitable for serializing
+ * and for manipulating in other ways.
+ *
+ * @param $conts
+ *   An array of containers to build, in the form $cnid => $value (where
+ *   $value is a boolean indicating whether or not to include the container).
+ *
+ * @return
+ *   A nested array of containers and categories.
+ */
+function category_legacy_build_container_tree($conts) {
+  $containers = array();
+  $all_conts = category_get_containers();
+
+  foreach ($conts as $cnid => $value) {
+    if ($value) {
+      $containers[$cnid] = (array) node_load($cnid);
+      if (empty($containers[$cnid]['nodes'][0])) {
+        unset($containers[$cnid]['nodes'][0]);
+      }
+
+      $cats = category_get_tree($cnid);
+      $containers[$cnid]['cats'] = array();
+      if (!empty($cats) && is_array($cats)) {
+        foreach ($cats as $cat) {
+          $cid = $cat->cid;
+          if (isset($containers[$cnid]['cats'][$cid])) {
+            unset($containers[$cnid]['cats'][$cid]);
+          }
+          $containers[$cnid]['cats'][$cid] = (array) node_load($cid);
+          $containers[$cnid]['cats'][$cid]['category']['legacy'] = category_legacy_get_cat_nodes($cid);
+        }
+      }
+    }
+  }
+
+  return $containers;
+}
+
+/**
+ * Build a container node object from a vocabulary.
+ *
+ * @param $vocab
+ *   The vocabulary array, as plucked out from the vocab tree.
+ *
+ * @return
+ *   A node object ready to be saved.
+ */
+function category_legacy_build_container_from_vocab($vocab) {
+  $node = (object) $vocab;
+
+  $node->title = $node->name;
+  unset($node->name);
+  $node->type = 'category_cont';
+  $node->has_relations = $node->relations;
+  unset($node->relations);
+  if ($node->module == 'taxonomy') {
+    $node->module = 'category';
+  }
+  unset($node->terms);
+
+  $node = _category_legacy_build_node($node);
+
+  return $node;
+}
+
+/**
+ * Build a container node object from a book.
+ *
+ * @param $book
+ *   The book array, as plucked out from the book tree.
+ *
+ * @return
+ *   A node object ready to be saved.
+ */
+function category_legacy_build_container_from_book($book) {
+  $node = (object) $book;
+
+  $node->type = 'category_cont';
+  $node->module = 'category';
+  $node->help = '';
+  $node->description = '';
+
+  $node = _category_legacy_build_node($node);
+
+  return $node;
+}
+
+/**
+ * Build a vocabulary form a container node object.
+ *
+ * @param $cont
+ *   The container array, as plucked out from the container tree.
+ *
+ * @return
+ *   A vocabulary object ready to be saved.
+ */
+function category_legacy_build_vocab_from_container($cont) {
+  $vocab = array();
+
+  $vocab['name'] = $cont['title'];
+  $vocab['description'] = $cont['description'];
+  $vocab['relations'] = $cont['has_relations'];
+  $vocab['synonyms'] = $cont['has_synonyms'];
+  $vocab['help'] = $cont['help'];
+  $vocab['hierarchy'] = $cont['hierarchy'];
+  $vocab['module'] = $cont['module'];
+  $vocab['multiple'] = $cont['multiple'];
+  $vocab['nodes'] = $cont['nodes'];
+  $vocab['required'] = $cont['required'];
+  $vocab['tags'] = $cont['tags'];
+  $vocab['weight'] = $cont['weight'];
+
+  if ($vocab['module'] == 'category') {
+    $vocab['module'] = 'taxonomy';
+  }
+
+  return $vocab;
+}
+
+/**
+ * Build a book node object from a container.
+ *
+ * @param $cont
+ *   The container array, as plucked out from the category tree.
+ *
+ * @return
+ *   A node object ready to be saved.
+ */
+function category_legacy_build_book_from_container($cont) {
+  $node = (object) $cont;
+
+  $node->type = 'book';
+  $node->help = '';
+  $node->description = '';
+  $node->parent = 0;
+
+  $node = _category_legacy_build_node($node);
+
+  return $node;
+}
+
+/**
+ * Build a category node object from a term.
+ *
+ * @param $term
+ *   The term array, as plucked out from the vocab tree.
+ *
+ * @param $cnid
+ *   The container to assign the new term to.
+ *
+ * @param $parent_map
+ *   An array of mappings. Key = tid, value = cid.
+ *
+ * @return
+ *   A node object ready to be saved.
+ */
+function category_legacy_build_category_from_term($term, $cnid, &$parent_map) {
+  $node = (object) $term;
+
+  $node->title = $node->name;
+  unset($node->name);
+  $node->type = 'category_cat';
+  $node->cnid = $cnid;
+
+  db_query('UPDATE {node} SET type = \'%s\' WHERE nid = %d', $node->type, $node->nid);
+
+  if (isset($node->relations) && is_array($node->relations)) {
+    foreach ($node->relations as $key => $relation) {
+      if ($relation && $parent_map[$relation]) {
+        $node->relations[$key] = $parent_map[$relation];
+      }
+      else {
+        unset($node->relations[$key]);
+      }
+    }
+  }
+
+  foreach ($node->parents as $parent) {
+    if ($parent && $parent_map[$parent]) {
+      $node->parents[] = $parent_map[$parent];
+    }
+  }
+  if (empty($node->parents) || empty($node->parents[0])) {
+    $node->parents[0] = $cnid;
+  }
+
+  $node = _category_legacy_build_node($node);
+
+  return $node;
+}
+
+/**
+ * Build a category node object from a book node.
+ *
+ * @param $book
+ *   The book array, as plucked out from the book tree.
+ *
+ * @return
+ *   A node object ready to be saved.
+ */
+function category_legacy_build_category_from_book($book, $cnid) {
+  $node = (object) $book;
+
+  $node->type = 'category_cat';
+  $node->cnid = $cnid;
+
+  $node->parents = array($node->parent);
+
+  $node = _category_legacy_build_node($node);
+
+  return $node;
+}
+
+/**
+ * Build a term object from a category node.
+ *
+ * @param $node
+ *   The node object, as plucked out from the category tree.
+ *
+ * @param $vid
+ *   The vocabulary ID to place the term into.
+ *
+ * @param $parent_map
+ *   An array of mappings. Key = cid, value = tid.
+ *
+ * @return
+ *   A term object ready to be saved.
+ */
+function category_legacy_build_term_from_category($node, $vid, &$parent_map) {
+  $term = array();
+
+  $term['name'] = $node['title'];
+  $term['vid'] = $vid;
+  $term['description'] = $node['description'];
+  $term['synonyms'] = $node['synonyms'];
+  $term['relations'] = $node['relations'];
+  $term['parent'] = $node['parents'];
+  $term['weight'] = $node['weight'];
+
+  if (isset($term['relations']) && is_array($term['relations'])) {
+    foreach ($term['relations'] as $key => $relation) {
+      if ($relation && $parent_map[$relation]) {
+        $term['relations'][$key] = $parent_map[$relation];
+      }
+      else {
+        unset($term['relations'][$key]);
+      }
+    }
+  }
+  foreach ($term['parent'] as $key => $parent) {
+    if ($parent && $parent_map[$parent]) {
+      $term['parent'][$key] = $parent_map[$parent];
+    }
+    else if ($parent == $node['cnid']) {
+      unset($term['parent'][$key]);
+    }
+  }
+  if (empty($term['parent']) || empty($term['parent'][0])) {
+    $term['parent'][0] = 0;
+  }
+
+  return $term;
+}
+
+/**
+ * Build a book node object from a category node.
+ *
+ * @param $cat
+ *   The category array, as plucked out from the category tree.
+ *
+ * @return
+ *   A node object ready to be saved.
+ */
+function category_legacy_build_book_from_category($cat, $cnid) {
+  $node = (object) $cat;
+
+  $node->type = 'book';
+
+  if (is_array($node->parents) && isset($node->parents[0])) {
+    $node->parent = $node->parents[0];
+  }
+  else {
+    $node->parent = 0;
+  }
+
+  $node = _category_legacy_build_node($node);
+
+  return $node;
+}
+
+/**
+ * Append additional fields to category and container node objects.
+ *
+ * @param $node
+ *   The node object to be modified.
+ *
+ * @return
+ *   The modified node object.
+ */
+function _category_legacy_build_node($node) {
+  global $user;
+
+  if (!isset($node->body)) {
+    $node->body = '';
+  }
+
+  // Force defaults
+  $node_options = variable_get('node_options_'. $node->type, array('status', 'promote'));
+  $node->status = in_array('status', $node_options);
+  $node->promote = in_array('promote', $node_options);
+  $node->sticky = in_array('sticky', $node_options);
+  $node->revision = in_array('revision', $node_options);
+  $node->name = $user->name ? $user->name : 0;
+  $node->date = date('j M Y H:i:s', ($node->created ? $node->created : NULL));
+  $node = node_submit($node);
+
+  return $node;
+}
+
+/**
+ * Determine whether or not a menu callback should be defined for the path
+ * 'taxonomy/term'. If the path already exists (because the taxonomy module
+ * has defined it), then a callback should not be defined. Otherwise,
+ * it should.
+ *
+ * @return
+ *   TRUE if a callback should be defined (or has already been defined by
+ *   THIS module); FALSE otherwise.
+ */
+function category_legacy_get_term_path_status() {
+  static $status;
+
+  if (!isset($status)) {
+    if (menu_get_item(NULL, 'taxonomy/term')) {
+      $status = FALSE;
+    }
+    else {
+      $status = TRUE;
+    }
+  }
+
+  return $status;
+}
+
+/**
+ * Determine whether or not menu callbacks should be defined for 'node/x'
+ * paths. If the relevant redirects exist in the category_legacy_map table,
+ * they should be defined. Otherwise, they should not.
+ *
+ * @return
+ *   TRUE if callbacks should be defined; FALSE otherwise.
+ */
+function category_legacy_get_cat_path_status() {
+  static $status;
+
+  if (!isset($status)) {
+    if (db_num_rows(db_query('SELECT * FROM {category_legacy_map} WHERE id_type = \'category\' AND redirect_type = \'taxonomy\''))) {
+      $status = TRUE;
+    }
+    else {
+      $status = FALSE;
+    }
+  }
+
+  return $status;
+}
+
+/**
+ * Menu callback; redirects the user to a taxonomy term's new category page.
+ */
+function category_legacy_term_page($str_tids = '', $depth = 0, $op = 'page') {
+  $operator = NULL;
+  $tids = array();
+
+  if (preg_match('/^([0-9]+[+ ])+[0-9]+$/', $str_tids)) {
+    $operator = '+';
+    // The '+' character in a query string may be parsed as ' '.
+    $tids = preg_split('/[+ ]/', $str_tids);
+  }
+  elseif (preg_match('/^([0-9]+,)+[0-9]+$/', $str_tids)) {
+    $operator = ',';
+    $tids = explode($operator, $str_tids);
+  }
+  elseif (preg_match('/^[0-9]+$/', $str_tids)) {
+    $tids = array($str_tids);
+  }
+
+  if (!empty($tids)) {
+    $tbcids = implode(', ', array_fill(0, count($tids), '%d'));
+    $sql = db_query('SELECT tbcid, redirect_id FROM {category_legacy_map} WHERE tbcid IN ('. $tbcids .') AND id_type = \'taxonomy\' AND redirect_type = \'category\'', $tids);
+
+    $map = array();
+    while ($result = db_fetch_object($sql)) {
+      $map[$result->tbcid] = $result->redirect_id;
+    }
+
+    // If the taxonomy wrapper is enabled, look for terms that have matching
+    // categories; and if those terms don't already have a redirect defined
+    // by category_legacy, add them to the redirect.
+    if (category_get_wrapper_status('taxonomy', TRUE)) {
+      foreach ($tids as $key => $tid) {
+        if (isset($map[$tid])) {
+          unset($tids[$key]);
+        }
+      }
+
+      if (count($tids)) {
+        $tbcids = implode(', ', array_fill(0, count($tids), '%d'));
+
+        $sql = db_query('SELECT tid FROM {term_data} t INNER JOIN {category} c ON t.tid = c.cid INNER JOIN {node} n ON t.tid = n.nid AND t.name = n.title WHERE t.tid IN ('. $tbcids. ')', $tids);
+
+        while ($result = db_fetch_object($sql)) {
+          $map[$result->tid] = $result->tid;
+        }
+      }
+    }
+
+    if (!empty($map)) {
+      $path = '';
+
+      if (!empty($operator)) {
+        $cids = implode($operator, $map);
+        $path = 'category/'. $cids;
+        if ($depth != 0 && $op == 'page') {
+          $path .= '/'. $depth;
+        }
+        elseif ($op == 'feed') {
+          $path .= '/'. $depth. '/'. $op;
+        }
+      }
+      else {
+        $cid = reset($map);
+        $path = 'node/'. $cid;
+        if ($op == 'feed') {
+          $path .= '/'. $op;
+        }
+      }
+
+      drupal_goto($path);
+    }
+  }
+
+  drupal_not_found();
+}
+
+function category_legacy_get_old_cat_paths($get_results = FALSE) {
+  static $items = array(), $results = array(), $is_run = FALSE;
+
+  if (!$is_run) {
+    $sql = db_query('SELECT tbcid, redirect_id FROM {category_legacy_map} WHERE id_type = \'category\' AND redirect_type = \'taxonomy\'');
+
+    while ($result = db_fetch_object($sql)) {
+      $items[] = array(
+        'path' => 'node/'. $result->tbcid,
+        'title' => t('content'),
+        'callback' => 'category_legacy_node_page',
+        'access' => user_access('access content'),
+        'type' => MENU_CALLBACK,
+      );
+      $results[$result->tbcid] = $result;
+    }
+
+    $is_run = TRUE;
+  }
+
+  if ($get_results) {
+    return $results;
+  }
+
+  return $items;
+}
+
+function category_legacy_node_page() {
+  $results = category_legacy_get_old_cat_paths(TRUE);
+  $nid = arg(1);
+
+  if (isset($nid) && is_numeric($nid)) {
+    $tid = $results[$nid]->redirect_id;
+    $extra = arg(2);
+    if (isset($extra) && $extra == 'feed') {
+      $extra = '/0/feed';
+    }
+    else {
+      $extra = '';
+    }
+
+    drupal_goto('taxonomy/term/'. $tid. $extra);
+  }
+
+  return node_page();
+}
+
+/**
+ * Deletes all legacy mappings from a taxonomy term to a category. Called when
+ * a category is deleted.
+ *
+ * @param $nid
+ *   The ID of the category being deleted.
+ */
+function category_legacy_map_delete($nid) {
+  db_query('DELETE FROM {category_legacy_map} WHERE redirect_id = %d AND redirect_type = \'node\'', $nid);
+}
+
+/**
+ * Identical function to taxomomy_get_vocabularies(), but duplicated here,
+ * because there is no guarantee that the taxonomy module is available (in
+ * fact, it's recommended that it's not enabled).
+ *
+ * Return an array of all vocabulary objects.
+ *
+ * @param $type
+ *   If set, return only those vocabularies associated with this node type.
+ */
+function category_legacy_get_vocabularies($type = NULL) {
+  if ($type) {
+    $result = db_query(db_rewrite_sql("SELECT v.vid, v.*, n.type FROM {vocabulary} v LEFT JOIN {vocabulary_node_types} n ON v.vid = n.vid WHERE n.type = '%s' ORDER BY v.weight, v.name", 'v', 'vid'), $type);
+  }
+  else {
+    $result = db_query(db_rewrite_sql('SELECT v.*, n.type FROM {vocabulary} v LEFT JOIN {vocabulary_node_types} n ON v.vid = n.vid ORDER BY v.weight, v.name', 'v', 'vid'));
+  }
+
+  $vocabularies = array();
+  $node_types = array();
+  while ($voc = db_fetch_object($result)) {
+    $node_types[$voc->vid][$voc->type] = $voc->type;
+    unset($voc->type);
+    $voc->nodes = $node_types[$voc->vid];
+    $vocabularies[$voc->vid] = $voc;
+  }
+
+  $types = node_get_types();
+  foreach ($vocabularies as $vid => $voc) {
+    foreach ($types as $name => $value) {
+      if (!isset($voc->nodes[$name])) {
+        $vocabularies[$vid]->nodes[$name] = 0;
+      }
+    }
+  }
+
+  return $vocabularies;
+}
+
+/**
+ * Return an array of all top-level book nodes.
+ */
+function category_legacy_get_books() {
+  $result = db_query(db_rewrite_sql('SELECT n.nid, b.parent, b.weight FROM {node} n INNER JOIN {book} b ON n.vid = b.vid WHERE b.parent = 0 ORDER BY b.weight, n.title'));
+
+  $books = array();
+  while ($book = db_fetch_object($result)) {
+    $books[$book->nid] = node_load($book->nid);
+    foreach ($book as $key => $value) {
+      $books[$book->nid]->$key = $value;
+    }
+  }
+
+  return $books;
+}
+
+/**
+ * Identical function to taxomomy_get_tree(), but duplicated here,
+ * because there is no guarantee that the taxonomy module is available (in
+ * fact, it's recommended that it's not enabled).
+ *
+ * Create a hierarchical representation of a vocabulary.
+ *
+ * @param $vid
+ *   Which vocabulary to generate the tree for.
+ *
+ * @param $parent
+ *   The term ID under which to generate the tree. If 0, generate the tree
+ *   for the entire vocabulary.
+ *
+ * @param $depth
+ *   Internal use only.
+ *
+ * @param $max_depth
+ *   The number of levels of the tree to return. Leave NULL to return all levels.
+ *
+ * @return
+ *   An array of all term objects in the tree. Each term object is extended
+ *   to have "depth" and "parents" attributes in addition to its normal ones.
+ */
+function category_legacy_get_tree($vid, $parent = 0, $depth = -1, $max_depth = NULL) {
+  static $children, $parents, $terms;
+
+  $depth++;
+
+  // We cache trees, so it's not CPU-intensive to call get_tree() on a term
+  // and its children, too.
+  if (!isset($children[$vid])) {
+    $children[$vid] = array();
+
+    $result = db_query(db_rewrite_sql('SELECT t.tid, t.*, parent FROM {term_data} t, {term_hierarchy} h WHERE t.tid = h.tid AND t.vid = %d ORDER BY weight, name', 't', 'tid'), $vid);
+    while ($term = db_fetch_object($result)) {
+      $children[$vid][$term->parent][] = $term->tid;
+      $parents[$vid][$term->tid][] = $term->parent;
+      $terms[$vid][$term->tid] = $term;
+    }
+  }
+
+  $max_depth = (is_null($max_depth)) ? count($children[$vid]) : $max_depth;
+  if ($children[$vid][$parent]) {
+    foreach ($children[$vid][$parent] as $child) {
+      if ($max_depth > $depth) {
+        $terms[$vid][$child]->depth = $depth;
+        // The "parent" attribute is not useful, as it would show one parent only.
+        unset($terms[$vid][$child]->parent);
+        $terms[$vid][$child]->parents = $parents[$vid][$child];
+        $tree[] = $terms[$vid][$child];
+
+        if ($children[$vid][$child]) {
+          $tree = array_merge($tree, category_legacy_get_tree($vid, $child, $depth, $max_depth));
+        }
+      }
+    }
+  }
+
+  return $tree ? $tree : array();
+}
+
+/**
+ * Returns an array of book nodes (excluding the root node) in the book
+ * specified by $parent.
+ */
+function category_legacy_get_book_tree($parent = 0) {
+  $tree = array();
+
+  $result = db_query(db_rewrite_sql('SELECT n.nid, b.parent, b.weight FROM {node} n INNER JOIN {book} b ON n.vid = b.vid WHERE b.parent = %d ORDER BY b.weight, n.title'), $parent);
+
+  while ($node = db_fetch_object($result)) {
+    $tree[$node->nid] = node_load($node->nid);
+    foreach ($node as $key => $value) {
+      $tree[$node->nid]->$key = $value;
+    }
+    $tree = array_merge($tree, category_legacy_get_book_tree($node->nid));
+  }
+
+  return $tree;
+}
+
+/**
+ * Identical function to taxonomy_get_related(), but duplicated here,
+ * because there is no guarantee that the taxonomy module is available (in
+ * fact, it's recommended that it's not enabled).
+ *
+ * Find all term objects related to a given term ID.
+ */
+function category_legacy_get_related($tid, $key = 'tid') {
+  $related = array();
+
+  if ($tid) {
+    $result = db_query('SELECT t.*, tid1, tid2 FROM {term_relation}, {term_data} t WHERE (t.tid = tid1 OR t.tid = tid2) AND (tid1 = %d OR tid2 = %d) AND t.tid != %d ORDER BY weight, name', $tid, $tid, $tid);
+    $related = array();
+    while ($term = db_fetch_object($result)) {
+      $related[$term->$key] = $term;
+    }
+  }
+
+  return $related;
+}
+
+/**
+ * Identical function to taxonomy_get_synonyms(), but duplicated here,
+ * because there is no guarantee that the taxonomy module is available (in
+ * fact, it's recommended that it's not enabled).
+ *
+ * Return an array of synonyms of the given term ID.
+ */
+function category_legacy_get_synonyms($tid) {
+  $synonyms = array();
+
+  if ($tid) {
+    $result = db_query('SELECT name FROM {term_synonym} WHERE tid = %d', $tid);
+    while ($synonym = db_fetch_array($result)) {
+      $synonyms[] = $synonym['name'];
+    }
+  }
+
+  return $synonyms;
+}
+
+/**
+ * Return an array of nodes assigned to the given term ID.
+ */
+function category_legacy_get_nodes($tid) {
+  $nodes = array();
+
+  if ($tid) {
+    $result = db_query('SELECT nid FROM {term_node} WHERE tid = %d', $tid);
+    while ($data = db_fetch_array($result)) {
+      $nodes[] = $data['nid'];
+    }
+  }
+
+  return $nodes;
+}
+
+/**
+ * Return an array of nodes assigned to the given category ID.
+ */
+function category_legacy_get_cat_nodes($cid) {
+  $nodes = array();
+
+  if ($cid) {
+    $result = db_query('SELECT nid FROM {category_node} WHERE cid = %d', $cid);
+    while ($data = db_fetch_array($result)) {
+      $nodes[] = $data['cid'];
+    }
+  }
+
+  return $nodes;
+}
+
+/**
+ * Maintains a cache of path aliases, based on a set of regular expression
+ * criteria. If no criteria are provided, no changes are made and the cache is
+ * returned.
+ *
+ * @param $criteria
+ *   An array of regular expression criteria, where each element is in the form
+ *   $name => $regex.
+ *
+ * @return
+ *   An array of alias objects.
+ */
+function category_legacy_get_path_cache($criteria = array()) {
+  static $paths = array();
+
+  if (!empty($criteria)) {
+    $sql = db_query('SELECT * FROM {url_alias}');
+    while ($result = db_fetch_object($sql)) {
+      foreach ($criteria as $name => $regex) {
+        if (preg_match($regex, $result->src)) {
+          $result->type = $name;
+          $paths[] = $result;
+        }
+      }
+    }
+  }
+
+  return $paths;
+}
+
+function category_legacy_save_vocabulary(&$edit) {
+  $edit['nodes'] = empty($edit['nodes']) ? array() : $edit['nodes'];
+
+  $edit['vid'] = db_next_id('{vocabulary}_vid');
+  db_query("INSERT INTO {vocabulary} (vid, name, description, help, multiple, required, hierarchy, relations, tags, weight, module) VALUES (%d, '%s', '%s', '%s', %d, %d, %d, %d, %d, %d, '%s')", $edit['vid'], $edit['name'], $edit['description'], $edit['help'], $edit['multiple'], $edit['required'], $edit['hierarchy'], $edit['relations'], $edit['tags'], $edit['weight'], isset($edit['module']) ? $edit['module'] : 'taxonomy');
+  foreach ($edit['nodes'] as $key => $type) {
+    if ($type) {
+      db_query("INSERT INTO {vocabulary_node_types} (vid, type) VALUES (%d, '%s')", $edit['vid'], $type);
+    }
+  }
+}
+
+function category_legacy_save_term(&$edit) {
+  $edit['tid'] = db_next_id('{term_data}_tid');
+  db_query("INSERT INTO {term_data} (tid, name, description, vid, weight) VALUES (%d, '%s', '%s', %d, %d)", $edit['tid'], $edit['name'], $edit['description'], $edit['vid'], $edit['weight']);
+
+  if ($edit['relations']) {
+    foreach ($edit['relations'] as $related_id) {
+      if ($related_id != 0) {
+        db_query('INSERT INTO {term_relation} (tid1, tid2) VALUES (%d, %d)', $edit['tid'], $related_id);
+      }
+    }
+  }
+
+  if (!isset($edit['parent']) || empty($edit['parent'])) {
+    $edit['parent'] = array(0);
+  }
+  if (is_array($edit['parent'])) {
+    foreach ($edit['parent'] as $parent) {
+      if (is_array($parent)) {
+        foreach ($parent as $tid) {
+          db_query('INSERT INTO {term_hierarchy} (tid, parent) VALUES (%d, %d)', $edit['tid'], $tid);
+        }
+      }
+      else {
+        db_query('INSERT INTO {term_hierarchy} (tid, parent) VALUES (%d, %d)', $edit['tid'], $parent);
+      }
+    }
+  }
+  else {
+    db_query('INSERT INTO {term_hierarchy} (tid, parent) VALUES (%d, %d)', $edit['tid'], $edit['parent']);
+  }
+
+  if ($edit['synonyms']) {
+    $synonyms = $edit['synonyms'];
+    if (!is_array($synonyms)) {
+      $synonyms = explode("\n", str_replace("\r", '', $edit['synonyms']));
+    }
+    foreach ($synonyms as $synonym) {
+      if ($synonym) {
+        db_query("INSERT INTO {term_synonym} (tid, name) VALUES (%d, '%s')", $edit['tid'], chop($synonym));
+      }
+    }
+  }
+}
+
+/**
+ * Save an exported book page.
+ */
+function category_legacy_book_insert($node) {
+  db_query("INSERT INTO {book} (nid, vid, parent, weight) VALUES (%d, %d, %d, %d)", $node->nid, $node->vid, $node->parent, $node->weight);
+}
+
+/**
+ * Similar function to taxonomy_del_vocabulary(), but duplicated here,
+ * because there is no guarantee that the taxonomy module is available (in
+ * fact, it's recommended that it's not enabled).
+ */
+function category_legacy_del_vocabulary($vid) {
+  db_query('DELETE FROM {vocabulary} WHERE vid = %d', $vid);
+  db_query('DELETE FROM {vocabulary_node_types} WHERE vid = %d', $vid);
+  $result = db_query('SELECT tid FROM {term_data} WHERE vid = %d', $vid);
+  while ($term = db_fetch_object($result)) {
+    category_legacy_del_term($term->tid);
+  }
+}
+
+/**
+ * Similar function to taxonomy_del_term(), but duplicated here,
+ * because there is no guarantee that the taxonomy module is available (in
+ * fact, it's recommended that it's not enabled).
+ */
+function category_legacy_del_term($tid) {
+  db_query('DELETE FROM {term_data} WHERE tid = %d', $tid);
+  db_query('DELETE FROM {term_hierarchy} WHERE tid = %d', $tid);
+  db_query('DELETE FROM {term_relation} WHERE tid1 = %d OR tid2 = %d', $tid, $tid);
+  db_query('DELETE FROM {term_synonym} WHERE tid = %d', $tid);
+  db_query('DELETE FROM {term_node} WHERE tid = %d', $tid);
+}

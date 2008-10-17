@@ -1,0 +1,6 @@
+; $Id: activitystream_twitter.info,v 1.1.2.1 2008/04/09 05:30:41 akalsey Exp $
+
+name = Twitter
+description = Public Twitter tweets
+dependencies = activitystream activitystream_feed
+package = Activity Stream

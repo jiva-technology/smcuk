@@ -1,0 +1,5 @@
+; $Id: category_display.info,v 1.1 2007/01/05 15:31:15 jaza Exp $
+name = Category display
+description = Allows additional output to be displayed and toggled for category and container nodes.
+package = Category
+dependencies = category

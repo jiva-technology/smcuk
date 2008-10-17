@@ -1,0 +1,6 @@
+; $Id: userlink.info,v 1.1.2.1 2007/06/18 23:07:11 dww Exp $
+name = Userlink
+description = The userlink module allows users to save and share links.
+package = ""
+project = "userlink"
+

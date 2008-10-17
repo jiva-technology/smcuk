@@ -1,0 +1,69 @@
+<?php
+// $Id: prepopulate.module,v 1.5.2.1 2008/03/12 16:40:38 add1sun Exp $
+
+/**
+ * @file
+ *  Fill form elements with data from GET.
+ *
+ *  Originally written by ea. Farris <eafarris@gmail.com>
+ *  Based on an idea from chx, from the conversation at
+ *  http://www.drupal.org/node/27155.
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function prepopulate_help($section) {
+  switch($section) {
+    case 'admin/modules#description':
+      return t('Pre-populates forms for allowed content types with HTTP GET data');
+      break;
+  } // endswitch $section
+} // endfunction prepopulate_help()
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function prepopulate_form_alter($form_id, &$form) {
+  $node = $form['#node'];
+
+  switch ($form_id) {
+    // On a node settings form, praise be to the FormsAPI!
+    case 'node_type_form':
+      $type = $form['#node_type']->type;
+      $form['workflow']['prepopulate_allowed'] = array(
+        '#type' => 'checkbox',
+        '#title' => 'Prepopulate form from URL?',
+        '#default_value' => variable_get('prepopulate_allowed_' . $type, TRUE),
+        '#description' => t('Allows fields to be prepopulated from the URL'),
+      );
+    return;
+  } // endswitch $form_id
+
+  if (isset($node)) {
+    if (variable_get('prepopulate_allowed_'. $node->type, TRUE) && $_GET['edit']) {
+      foreach (array_keys((array)$_GET['edit']) as $getvar) {
+        if (element_child($getvar) && !is_null($form[$getvar])) {
+          _prepopulate_get_walk($form[$getvar], $_GET['edit'][$getvar]);
+        }
+      } // endforeach get variable
+    } // endif any get vars
+  }
+  
+} // endfunction prepopulate_form_alter()
+
+/**
+ * Internal helper to get variables from the $_GET.
+ */
+function _prepopulate_get_walk(&$form, &$getslice) {
+  if (!is_array($getslice)) {
+    $form['#default_value'] = $getslice;
+  } 
+  else {
+    foreach (array_keys($getslice) as $getvar) {
+      if (element_child($getvar) && is_array($form) && !is_null($form[$getvar])) {
+        _prepopulate_get_walk($form[$getvar], $getslice[$getvar]);
+      }
+    } // endforeach walking through get
+  } // endif getslice is not an array
+} // endfunction _prepopulate_get_walk()

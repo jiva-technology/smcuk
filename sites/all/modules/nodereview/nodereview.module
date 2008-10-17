@@ -1,0 +1,486 @@
+<?php
+// $Id: nodereview.module,v 1.5.2.3 2007/11/09 00:50:37 crell Exp $
+
+require_once(
+  drupal_get_path('module', 'nodereview') . '/nodereview_node_nodereview.inc'
+);
+
+if (module_exists('views')) {
+  require_once(drupal_get_path('module', 'nodereview') . '/nodereview_views.inc');
+}
+
+/** 
+ * @file
+ * This module adds user reviews to specified node types, on multiple axes and with
+ * voting via the Voting API module (required).  It uses the Views module
+ * (required) for some displays.
+ *
+ */
+
+/* ----- System hooks ----- */
+
+/**
+ * Implementation of hook_help().
+ * 
+ */
+function nodereview_help($section) {
+
+  // We want to show custom help text on both the add and edit pages, which 
+  // have very different path structures
+  if ('node' == arg(0)) {
+    if ('addreview' == arg(2)) {
+      $reviewed_nid = arg(1);
+      $reviewed_node = node_load($reviewed_nid);
+      $help_text = filter_xss_admin(variable_get('nodereview_guide_'. $reviewed_node->type, ''));
+      if ($help_text) return $help_text;
+    }
+    elseif ('edit' == arg(2)) {
+      // Get the type of the node we're reviewing, which is not the nid in the path
+      $type = db_result(db_query("SELECT n.type 
+        FROM {node} n 
+          INNER JOIN {nodereview} nr ON n.nid=nr.reviewed_nid
+        WHERE nr.nid=%d", arg(1)));
+
+      $help_text = filter_xss_admin(variable_get('nodereview_guide_'. $type, ''));
+      if ($help_text) return $help_text;
+    }
+  }
+}
+
+/**
+ * Implementation of hook_node_info().
+ * 
+ */
+
+function nodereview_node_info() {
+  return array(
+    'nodereview' => array(
+      'name' => t('Review'), 
+      'module' => 'nodereview',
+      'description' => 'A review is a user-supplied critique of another node.',
+      'has_title' => TRUE,
+      'title_label' => t('Short comment'),
+      'has_body' => FALSE,
+    )
+  );
+}
+
+
+/**
+ * Implementation of hook_perm().
+ *
+ */
+function nodereview_perm() {
+  return array('administer reviews', 'read reviews', 'submit reviews', 'edit own reviews');
+}
+
+/**
+ * Implementation of hook_link().
+ *
+ */
+function nodereview_link($type, $node = 0, $main) {
+  $links = array();
+  global $user;
+
+  if ('node' == $type && 'nodereview' == $node->type) {
+  
+    // Add a link back to the node being reviewed by this node
+    $reviewed_type = node_get_types('type', db_result(db_query("SELECT type FROM {node} WHERE nid=%d", $node->reviewed_nid)));
+    $reviewed_type = $reviewed_type->name;
+
+    $links['nodereview_reviewed_node'] = array(
+    'title' => t('View @type', array('@type' => $reviewed_type)),
+    'href' => "node/{$node->reviewed_nid}",
+    'attributes' => array('title' => t('View the @type being reviewed', array('@type' => $reviewed_type))),
+   );
+  }
+
+  return $links;
+}
+
+/**
+ * Implementation of hook_menu().
+ *
+ */
+function nodereview_menu($may_cache) {
+  $items = array();
+
+  global $user;
+
+  if ($may_cache) {
+    $items[] = array(
+      'path' => 'admin/content/nodereview',
+      'title' => t('Review types'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => t('nodereview_configure'),
+      'access' => user_access('administer reviews'),
+    );
+    $items[] = array(
+      'path' => 'admin/content/nodereview/types',
+      'title' => t('List'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => t('nodereview_configure'),
+      'access' => user_access('administer reviews'),
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+      'weight' => -1,
+    );
+    // Hide the normal node-add page, since we never want users to see it
+    $items[] = array(
+      'path' => 'node/add/nodereview',
+      'access' => FALSE,
+    );
+  }
+  else {
+
+    // Add a tab for each node type that we can review
+    // It's slow to put this here, as it should go in 
+    foreach(node_get_types() as $type => $info) {
+      if (variable_get('nodereview_use_'. $type, 0)) {
+        $items[] = array(
+          'path' => 'admin/content/nodereview/'. $type,
+          'type' => MENU_LOCAL_TASK,
+          'title' => t($info->name),
+          'callback' => 'drupal_get_form',
+          'callback arguments' => array('nodereview_configure_axes', $type),
+          'access' => user_access('administer reviews'),
+        );
+      }
+    }
+
+    // To avoid SQL overhead, check whether we are on a node page and whether the
+    // user is allowed to write reviews.
+    if (arg(0) == 'node' && is_numeric(arg(1))) {
+
+      // Only add review tabs if this is one of the nodes we want to review.
+      $type = db_result(db_query("SELECT n.type FROM {node} n WHERE n.nid = %d", arg(1)));
+
+      // Only add menu items for reviews if we're supposed to on this node type, *and* there is at least one axis defined.
+      if (variable_get('nodereview_use_' . $type, 0) && db_result(db_query("SELECT COUNT(*) FROM {nodereview_axes} WHERE node_type='%s'", $type))) {
+        $items[] = array(
+          'path' => 'node/' . arg(1) . '/reviews',
+          'callback' => 'views_page',
+          'callback arguments' => array('review list', arg(1)),
+          'type' => MENU_LOCAL_TASK,
+          'title' => t('Reviews'),
+          'weight' => 2,
+          'access' => user_access('read reviews'),
+        );
+        // The permission check is redundant, but is to avoid the SQL hit if we don't need these menu items anyway
+        if (user_access('submit reviews')) {
+          $review_nid = db_result(db_query("SELECT n.nid FROM {node} n INNER JOIN {nodereview} nr ON n.nid=nr.nid WHERE uid=%d AND reviewed_nid=%d", $user->uid, arg(1)));
+          if ($review_nid) {
+            $review_node = node_load(array('nid'=>$review_nid));
+            $items[] = array(
+              'path' => 'node/'. arg(1) .'/editreview',
+              'title' => t('Edit your review'),
+              'callback' => 'node_page_edit',
+              'callback arguments' => array($review_node),
+              'access' => user_access('edit own reviews') || user_access('administer reviews'),
+              'type' => MENU_LOCAL_TASK,
+              'weight' => 3
+            );
+          }
+          else {
+            $items[] = array(
+              'path' => 'node/'. arg(1) .'/addreview',
+              'title' => t('Add review'),
+              'callback' => 'node_add',
+              'callback arguments' => array('nodereview'),
+              'access' => user_access('submit reviews'),
+              'type' => MENU_LOCAL_TASK,
+              'weight' => 3
+            );
+          }
+        }
+      }
+    }
+  }
+
+  return $items;
+}
+
+/**
+ * Implementation of hook_form_alter()
+ */
+function nodereview_form_alter($form_id, &$form) {
+//   dpm($form_id);
+
+  if ('node_type_form' == $form_id) {
+    $node_type = $form['old_type']['#value'];
+    if ($node_type == 'nodereview') { // We don't use the normal submission guidelines anyway, so hide the form field for them.
+      $form['submission']['help']['#type'] = 'value';
+      $form['submission']['help']['#value'] = '';
+    }
+    $form['workflow']['nodereview_use'] = array(  // The node type form automatically appends the node type to the variable name when saving
+      '#type' => 'radios',
+      '#title' => t('Enable user reviews'),
+      '#default_value' => variable_get('nodereview_use_' . $node_type, 0),
+      '#options' => array(0 => t('Disabled'), 1 => t('Enabled')),
+      '#description' => t('You can configure axes for reviewable nodes on the <a href="!url">reviews page</a>.', array('!url' => url('admin/content/nodereview'))),
+    );
+  }
+}
+
+
+/* ----- Menu callbacks ----- */
+
+/*
+function nodereview_add_review($reviewed_nid) {
+  //return node_add('nodereview');
+
+  // Borrowed from node_add(), and modified as needed
+  global $user;
+  $node = array('uid' => $user->uid, 'name' => $user->name, 'type' => 'nodereview');
+ 
+  $output = node_form($node);
+  drupal_set_title(t('Submit %name', array('%name' => node_get_name($node))));
+  
+  return $output;
+}
+*/
+
+/*
+function nodereview_edit_review() {
+
+  global $user;
+
+  // We'll want the title from the real node
+  $node = node_load(arg(1));
+
+  // This code ripped straight from node_page() and tweaked
+  if (is_numeric(arg(1))) {
+    $review_nid = db_result(db_query("SELECT n.nid FROM {node} n INNER JOIN {nodereview} nr ON n.nid=nr.nid WHERE uid=%d AND reviewed_nid=%d", $user->uid, arg(1)));
+    $review_node = node_load(array('nid'=>$review_nid));
+    if ($review_node->nid) {
+      drupal_set_title(check_plain($node->title));
+      return node_form($review_node);
+    }
+    else if (db_result(db_query('SELECT nid FROM {node} WHERE nid = %d', arg(1)))) {
+      drupal_access_denied();
+    }
+    else {
+      drupal_not_found();
+    }
+  }
+}
+*/
+
+function nodereview_view_reviews($nid) {
+
+  $output = 'test ' . $nid;
+
+  drupal_set_title('Reviews');
+
+  return $output;
+}
+
+
+/**
+ * We use this function in place of hook_settings(), because hook_settings()
+ * isn't fancy enough to support what we need to do.
+ * 
+ */
+function nodereview_configure($type = NULL) {
+
+  $form = array();
+
+  foreach(node_get_types() as $type => $info) {
+    $options[$type] = $info->name;
+    if (variable_get('nodereview_use_'. $type, 0)) {
+      $default[] = $type;
+    }
+  }
+
+  $form['nodereview'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Review types'),
+    '#collapsible' => FALSE,
+    '#collapsed' => FALSE,
+  );
+  $form['nodereview']['types'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Reviewable content types'),
+    '#default_value' => $default,
+    '#options' => $options,
+    '#description' => t('Specify which content types can be reviewed.'),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit', 
+    '#value' => t('Save'),
+  );
+
+  return $form;
+
+
+
+}
+
+
+function nodereview_configure_submit($form_id, $form_values) {
+  foreach ($form_values['types'] as $type => $checked) {
+    variable_set('nodereview_use_'. $type, (bool)$checked);
+  }
+}
+
+
+function nodereview_configure_axes($type) {
+
+  //drupal_set_title("review for '{$type}' nodes");
+  drupal_set_title(t('Reviews for %type nodes', array('%type' => check_plain($type))));
+
+  $form['use'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('reviews'),
+      '#collapsible' => TRUE,
+      '#collapsed' => FALSE,
+  );
+  /*
+  $form['use']['use'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Enable reviews for this content type'),
+    '#return_value' => 1,
+    '#default_value' => variable_get('nodereview_use_'. $type, 0),
+    '#description' => t('Enable the reviewing of content of this type.  (If unchecked, the information below is ignored.)'),
+  );
+  */
+  $form['use']['node_type'] = array('#type' => 'hidden', '#value' => $type);
+  $form['use']['guide'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Usage Guide to the User'),
+    '#return_value' => 1,
+    '#default_value' => variable_get('nodereview_guide_'. $type, ''),
+    '#description' => t('Instructions to users for how to use this review.  These will be shown on the "Add Review" page. Note that if you have help text defined on admin/settings/content-types/nodereview, this value will override it.'),
+  );
+
+  $form['axes'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('review axes'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    '#tree' => TRUE,
+  );
+
+  // We'll store field information in its own table
+  $result = db_query("SELECT aid, tag, weight FROM {nodereview_axes} WHERE node_type='%s' ORDER BY weight", $type);
+  //$result = db_query("SELECT aid, tag, weight FROM {nodereview_axes} ORDER BY weight");
+
+  $axes = array();
+
+  while ($record = db_fetch_object($result)) {
+    $axes[] = _nodereview_configure_axis($record);
+  }
+
+  $record = new stdClass();
+  $record->aid = 0;
+  $record->node_type = $type;
+
+  $axes[] = _nodereview_configure_axis($record);
+
+  $form['axes'] += $axes;
+
+  $form['submit'] = array('#type' => 'submit', '#value' => t('Save'));
+
+  return $form;
+
+}
+
+function nodereview_configure_axes_submit($form_id, $form_values) {
+
+  // Save whether or not we're reviewing this node type
+//   variable_set('nodereview_use_' . $form_values['node_type'], $form_values['use']);
+  variable_set('nodereview_guide_'. $form_values['node_type'], $form_values['guide']);
+
+  // Regardless, save the user's data, just in case they may want it later
+  foreach ($form_values['axes'] as $axis) {
+    if ($axis['aid'] && $axis['use']) {
+      // Update an existing axis
+      db_query("UPDATE {nodereview_axes} SET tag='%s', weight=%d WHERE aid=%d", $axis['tag'], $axis['weight'], $axis['aid']);
+    }
+    elseif ($axis['aid'] && ! $axis['use']) {
+      // Delete an existing axis
+      db_query("DELETE FROM {nodereview_axes} WHERE aid=%d", $axis['aid']);
+    }
+    elseif ($axis['use'] && ! $axis['aid']) {
+      // Create a new axis
+      db_query("INSERT INTO {nodereview_axes} (node_type, tag, weight) VALUES ('%s', '%s', %d)", $form_values['node_type'], $axis['tag'], $axis['weight']);
+    }
+    else {
+      // Doesn't exist and don't use, so just ignore
+    }
+  }
+}
+
+
+function _nodereview_configure_axis($record) {
+
+  $form['aid'] = array(
+    '#type' => 'hidden',
+    '#value' => $record->aid,
+  );
+  $form['use'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Use axis'),
+    '#return_value' => 1,
+    '#default_value' => (boolean)($record->aid),
+    '#description' => t(''),
+  );
+  $form['tag'] = array(
+    '#type' => 'textfield',
+    '#title' => t('name'),
+    '#return_value' => 1,
+    '#default_value' => $record->tag,
+    '#size' => 30,
+  );
+  $form['weight'] = array(
+    '#type' => 'weight',
+    '#title' => t('weight'),
+    '#delta' => 10,
+    '#default_value' => $record->weight,
+    '#description' => t(''),
+  );
+
+  return $form;
+}
+
+
+function nodereview_list_axes($node_type) {
+  static $axes = array();
+
+  if (! isset($axes[$node_type])) {
+    $result = db_query("SELECT na.aid, na.tag FROM {nodereview_axes} na WHERE na.node_type='%s'", $node_type);
+    while ($record = db_fetch_object($result)) {
+      $axes[$node_type][$record->aid] = $record->tag;
+    }
+  }
+  return $axes[$node_type];
+}
+
+
+function theme_nodereview_configure_axes($form) {
+  
+  $rows = array();
+  $output = '';
+  
+//   $output .= form_render($form['use']);
+  
+  foreach (element_children($form['axes']) as $key) {
+    $row = array();
+    // Strip out the labels on each form element, since they're redundant with the header
+    $form['axes'][$key]['use']['#title'] = '';
+    $form['axes'][$key]['tag']['#title'] = '';
+    $form['axes'][$key]['weight']['#title'] = '';
+
+    $row[] = drupal_render($form['axes'][$key]['aid']) . drupal_render($form['axes'][$key]['use']);
+    $row[] = drupal_render($form['axes'][$key]['tag']);
+    $row[] = drupal_render($form['axes'][$key]['weight']);
+    $rows[] = $row;
+  }
+ 
+  $header = array('use', 'name', 'weight');
+  // This is how we get the table to be "inside" the fieldset
+  $form['axes']['#children'] = theme('table', $header, $rows);
+  $output .= drupal_render($form);
+  return $output;
+ 
+}
+

@@ -1,0 +1,5 @@
+; $Id: commentactivity.info,v 1.1.2.1 2008/01/20 11:46:48 robertDouglass Exp $
+name = Comment activity
+description = Enable activity notifications for comments.
+dependencies = activity comment
+package = Activity

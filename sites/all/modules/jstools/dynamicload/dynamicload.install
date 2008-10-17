@@ -1,0 +1,90 @@
+<?php
+// $Id: dynamicload.install,v 1.2.2.3 2007/08/08 21:26:09 nedjo Exp $
+
+/** 
+ * Implementation of hook_install(). 
+ */
+function dynamicload_install() {  
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("CREATE TABLE {dynamicload_blocks} (
+        module varchar(64) NOT NULL,
+        delta varchar(32) NOT NULL,
+        refresh int NOT NULL default '0',
+        refresh_interval int NOT NULL default '0',
+        scroll int NOT NULL default '0',
+        apply int NOT NULL default '0',
+        target varchar(128) NOT NULL default '',
+        method int NOT NULL default '0',
+        PRIMARY KEY (module, delta)
+      ) /*!40100 DEFAULT CHARACTER SET UTF8 */ ");
+      break;
+    case 'pgsql':
+      db_query("CREATE TABLE {dynamicload_blocks} (
+        module varchar(64) NOT NULL,
+        delta varchar(32) NOT NULL,
+        refresh int NOT NULL default '0',
+        refresh_interval int NOT NULL default '0',
+        scroll int NOT NULL default '0',
+        apply int NOT NULL default '0',
+        target varchar(128) NOT NULL default '',
+        method int NOT NULL default '0',
+        PRIMARY KEY (module, delta)
+      )");
+      break;
+
+  }
+}
+
+function dynamicload_update_1() {
+  if (!db_table_exists('{dynamicload_blocks}')) {
+    dynamicload_install();
+  }
+  return array();
+}
+
+function dynamicload_update_2() {
+  $ret = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {dynamicload_blocks} ADD refresh_interval int NOT NULL default '0'");
+      break;
+    case 'pgsql':
+      db_add_column($ret, 'dynamicload_blocks', 'refresh_interval', 'int', array('not null' => TRUE, 'default' => 0));
+      break;
+
+  }
+  return $ret;
+}
+
+function dynamicload_update_3() {
+  $ret = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {dynamicload_blocks} ADD method int NOT NULL default '0'");
+      break;
+    case 'pgsql':
+      db_add_column($ret, 'dynamicload_blocks', 'method', 'int', array('not null' => TRUE, 'default' => 0));
+      break;
+
+  }
+  return $ret;
+}
+
+function dynamicload_update_4() {
+  $ret = array();
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      $ret[] = update_sql("ALTER TABLE {dynamicload_blocks} ADD scroll int NOT NULL default '0'");
+      break;
+    case 'pgsql':
+      db_add_column($ret, 'dynamicload_blocks', 'scroll', 'int', array('not null' => TRUE, 'default' => 0));
+      break;
+
+  }
+  return $ret;
+}

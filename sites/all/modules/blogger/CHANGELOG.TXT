@@ -1,0 +1,8 @@
+5.x-1.0 : Bug Fixed - Blogger "read more" works for Administrator only (Reported by: Mini_me)
+5.x-1.1 : Bug Fixed - Add new permission: administer blogger
+5.x-1.2 : New - Replace html format with blogger.css
+          New - Add detail instruction to README.TXT
+5.x-1.3 : New - Exclude centain UIDs
+        : Bug Fixed - Add table width 100% in CSS file  
+5.x-1.4 : New - Order by Created Date and Random 
+          (thank to sebs-http://drupal.org/user/61080)

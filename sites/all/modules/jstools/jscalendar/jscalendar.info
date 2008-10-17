@@ -1,0 +1,4 @@
+; $Id $
+name = JS Calendar
+description = Enables popup calendars for selecting dates using the jscalendar library.
+package = Javascript tools

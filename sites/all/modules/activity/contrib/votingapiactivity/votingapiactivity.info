@@ -1,0 +1,5 @@
+; $Id: votingapiactivity.info,v 1.1.2.3 2008/02/20 18:25:29 sirkitree Exp $
+name = Voting activity
+description = Enable activity notifications for voting.
+dependencies = activity votingapi
+package = Activity

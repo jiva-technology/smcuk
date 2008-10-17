@@ -1,0 +1,249 @@
+<?php
+// $Id: category_outliner.module,v 1.3 2007/01/05 15:31:15 jaza Exp $
+
+/**
+ * @file
+ * Provides an administrative interface for easily editing and re-arranging
+ * categories.
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function category_outliner_help($section) {
+  switch ($section) {
+    case 'admin/category/list/orphan':
+      return t('<p>Categories in a site are like a tree. As they are edited, reorganized and removed, children might be left with no link to the rest of the structure.  Such categories are referred to as "orphans".  On this page, administrators can review their site for orphans and reattach those categories as desired.</p>');
+  }
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function category_outliner_menu($may_cache) {
+  $items = array();
+
+  if ($may_cache) {
+    $items[] = array(
+      'path' => 'admin/content/category/list/outline',
+      'title' => t('Outline'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => array('category_outliner_outline'),
+      'access' => user_access('administer categories'),
+      'type' => MENU_LOCAL_TASK,
+      'weight' => -3,
+    );
+    $items[] = array(
+      'path' => 'admin/content/category/list/orphan',
+      'title' => t('Orphans'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => array('category_outliner_orphan'),
+      'type' => MENU_LOCAL_TASK,
+      'access' => user_access('administer categories'),
+      'weight' => 0,
+    );
+  }
+  else {
+    if (arg(0) == 'admin' && arg(2) == 'category' && is_numeric(arg(3))) {
+      $nid = arg(3);
+      $node = node_load($nid);
+
+      $items[] = array(
+        'path' => 'admin/content/category/' . $nid . '/list/outline',
+        'title' => t('Outline'),
+        'callback' => 'drupal_get_form',
+        'callback arguments' => array('category_outliner_outline'),
+        'access' => user_access('administer categories'),
+        'type' => MENU_LOCAL_TASK,
+        'weight' => -3,
+      );
+
+      $items[] = array(
+        'path' => 'admin/content/category/' . $nid . '/list/orphan',
+        'title' => t('Orphans'),
+        'callback' => 'drupal_get_form',
+        'callback arguments' => array('category_outliner_orphan'),
+        'access' => user_access('administer categories'),
+        'type' => MENU_LOCAL_TASK,
+        'weight' => 0,
+      );
+    }
+  }
+
+  return $items;
+}
+
+/**
+ * Menu callback: display an administrative view of the hierarchy of all
+ * categories.
+ */
+function category_outliner_outline() {
+  $tree = array();
+  if (!is_numeric(arg(3))) {
+    $tree = category_get_tree(0);
+  }
+  else {
+    $tree = category_get_tree(arg(3));
+  }
+
+  if (count($tree) > 0) {
+    $form = array();
+
+    $form['table'] = _category_outliner_table($tree);
+    $form['save'] = array(
+      '#type' => 'submit',
+      '#value' => t('Save categories and containers'),
+    );
+  }
+  else {
+    $form = array('#value' => '<p>'. t('There are no containers or categories.') .'</p>');
+  }
+
+  return $form;
+}
+
+/**
+ * Menu callback; displays a listing of all orphaned categories.
+ */
+function category_outliner_orphan() {
+  $is_cont = is_numeric(arg(3));
+
+  $container_sql = $is_cont ? 'AND c.cnid = %d' : '';
+  $result = db_query(db_rewrite_sql('SELECT c.*, n.title, c2.cid AS parent_cid FROM {category} c INNER JOIN {node} n ON c.cid = n.nid INNER JOIN {category_hierarchy} ch ON c.cid = ch.cid LEFT JOIN {category} c2 ON ch.parent = c2.cid WHERE ch.parent != 0 '. $container_sql), arg(3));
+
+  $categories = array();
+  $non_orphans = array();
+  while ($category = db_fetch_object($result)) {
+    if (!isset($non_orphans[$category->cid])) {
+      if (!empty($category->parent_cid)) {
+        $non_orphans[$category->cid] = TRUE;
+      }
+      else {
+        $categories[$category->cid] = $category;
+      }
+    }
+  }
+
+  $orphans = array();
+  foreach ($categories as $cid => $category) {
+    $orphans[] = $category;
+    $cnid = $is_cont ? $category->cnid : 0;
+    $children = category_get_tree($cnid, ($is_cont ? NULL : $cid), -1, NULL, TRUE);
+    foreach ($children as $child) {
+      $child->depth++;
+      $orphans[] = $child;
+    }
+  }
+
+  if (count($orphans)) {
+    $form = array();
+
+    $form['table'] = _category_outliner_table($orphans);
+    $form['save'] = array(
+      '#type' => 'submit',
+      '#value' => t('Save categories and containers'),
+    );
+  }
+  else {
+    $form = array('#value' => '<p>'. t('There are no containers or categories.') .'</p>');
+  }
+
+  return $form;
+}
+
+function category_outliner_outline_submit($form_id, $form_values) {
+  foreach ($form_values['table'] as $row) {
+    $node = node_load($row['nid']);
+
+    if ($row['title'] != $node->title || $row['weight'] != $node->weight) {
+      $node->title = $row['title'];
+      $node->weight = $row['weight'];
+
+      node_save($node);
+      watchdog('content', t('%type: updated %title.', array('%type' => t('category'), '%title' => $node->title)), WATCHDOG_NOTICE, l(t('view'), 'node/'. $node->nid));
+    }
+  }
+
+  if (arg(4) == 'outline' || arg(5) == 'outline') {
+    // Updating entire category outline.
+    drupal_set_message(t('Updated categories and containers.'));
+  }
+  else {
+    // Updating the orphan categories.
+    drupal_set_message(t('Updated orphan categories.'));
+  }
+}
+
+function theme_category_outliner_table($form) {
+  $header = array(t('Title'), t('Weight'), array('data' => t('Operations'), 'colspan' => '3'));
+  $destination = drupal_get_destination();
+
+  $start_from      = $_GET['page'] ? $_GET['page'] : 0;
+  $total_entries   = 0;  // total count for pager
+  $page_increment  = 25; // number of rows per page
+  $displayed_count = 0;  // number of rows shown
+
+  $rows = array();
+  foreach (element_children($form) as $key) {
+    $total_entries++; // we're counting all-totals, not displayed
+    if (($start_from && ($start_from * $page_increment) >= $total_entries) || ($displayed_count == $page_increment)) {
+      continue;
+    }
+
+    $nid = $form[$key]['nid']['#value'];
+    $rows[] = array(
+      '<div style="padding-left: '. (25 * $form[$key]['depth']['#value']) .'px;">'. drupal_render($form[$key]['title']) .'</div>',
+      drupal_render($form[$key]['weight']),
+      l(t('view'), 'node/'. $nid),
+      l(t('edit'), 'node/'. $nid .'/edit', array(), $destination),
+      l(t('delete'), 'node/'. $nid .'/delete', array(), $destination)
+    );
+
+    $displayed_count++; // we're counting containers displayed
+  }
+
+  $output = theme('table', $header, $rows);
+
+  $GLOBALS['pager_page_array'][] = $start_from;  // FIXME
+  $GLOBALS['pager_total'][] = intval($total_entries / $page_increment) + 1; // FIXME
+
+  if ($total_entries >= $page_increment) {
+    $output .= theme('pager', NULL, $page_increment);
+  }
+
+  return $output;
+}
+
+function _category_outliner_table($tree = array()) {
+  $form = array(
+    '#theme' => 'category_outliner_table',
+    '#tree' => TRUE,
+  );
+
+  $categories = array();
+  foreach ($tree as $category) {
+    if (!in_array($category->cid, $categories)) {
+      $form[] = _category_outliner_table_tree($category, 0);
+      $categories[] = $category->cid;
+    }
+  }
+
+  return $form;
+}
+
+function _category_outliner_table_tree($category) {
+  return array(
+    'nid' => array('#type' => 'value', '#value' => $category->cid),
+    'depth' => array('#type' => 'value', '#value' => $category->depth),
+    'title' => array(
+      '#type' => 'textfield',
+      '#default_value' => $category->title,
+      '#maxlength' => 255,
+    ),
+    'weight' => array(
+      '#type' => 'weight',
+      '#default_value' => $category->weight,
+      '#delta' => 15,
+    ),
+  );
+}

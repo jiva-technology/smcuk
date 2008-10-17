@@ -1,0 +1,92 @@
+<?php
+// $Id: views_bookmarkactivity.module,v 1.1.2.8 2008/04/15 16:18:51 jaydub Exp $
+
+/**
+ * Activity definition file
+ *
+ * This defines what hooks activity module should use
+ */
+function views_bookmarkactivity_activity_info() {
+  $types = views_bookmark_get_bookmarks();
+  foreach ($types as $type) {
+    $token_types[$type->title] = $type->title;
+  }
+  return array(
+    'ops' => array('mark' => t('Mark'), 'unmark' => t('Unmark')),
+    'types' => $token_types,
+    'roles' => array(
+      'author' => array(
+        '#name' => t('Author'),
+        '#description' => t('The person who bookmarked the node.'),
+        '#default' => t('[author] [operation]ed the [node-type] [node-title-link]'),
+      ),
+      'all' => array(
+        '#name' => t('All'),
+        '#description' => t('The general public.'),
+        '#default' => t('[author] [operation]ed the [node-type] [node-title-link]'),
+      ),
+    ),
+  );
+}
+/**
+ * Token module integration.
+ */
+function views_bookmarkactivity_token_list($type = 'all') {
+  if ($type == 'views_bookmarkactivity') {
+    $tokens['views_bookmarkactivity'] = array('node-id'  => t('Id of the node that was bookmarked'),
+      'operation' => t('The verb of the operation that took place, eg. "mark", "unmark"'),
+      'author' => t('Person who bookmarked the node'),
+      'node-title' => t('Title of the node that was bookmarked'),
+      'node-title-link' => t('Link to the node that was bookmarked'),
+      'node-type' => t('The type of the node that was bookmarked'),
+      'author-name' => t('The name of who bookmarked the node'),      
+    );
+    
+    return $tokens;
+  }
+}
+
+function views_bookmarkactivity_token_values($type, $data = NULL, $options = array()) {
+  static $authors;
+  if ($type == 'views_bookmarkactivity' && !empty($data)) {
+    if (!isset($authors[$data['author-uid']])) {
+    $author = db_fetch_object(db_query('SELECT uid, name FROM {users} WHERE uid = %d', $data['author-uid']));
+      $authors[$data['author-uid']] = theme('username', $author);
+    }
+    $data['author'] = $authors[$data['author-uid']];
+    return $data;
+  }
+}
+
+/**
+ * Implementation of hook_views_bookmark_api()
+ * @param $vb_name
+ *   bookmark type name
+ * @param $vbid
+ *   id of the bookmark type
+ * @param $vb_uid
+ *   user id who marked
+ * @param $nid
+ *   node id that was bookmarked
+ */
+function views_bookmarkactivity_views_bookmark_api($vb_name, $vbid, $vb_uid, $nid) {
+  global $user;
+  $node = node_load($nid);
+  $types = views_bookmark_get_bookmarks();
+  $type = $types[$vbid]->title;
+  $account = user_load(array('uid' => $vb_uid, 'status' => 1));
+  $data = array(
+    'operation' => $vb_name,
+    'node-id' => $node->nid,
+    'author-uid' => $vb_uid,
+    'node-title' => $node->title,
+    'node-type' => strtolower(node_get_types('name', $node->type)),
+    'node-title-link' => l($node->title, 'node/'. $node->nid),
+    'author-name' => $account->name,
+  );
+  $target_users_roles = array(
+    ACTIVITY_ALL => 'all',
+    $vb_uid => 'author' 
+  );
+  activity_insert('views_bookmarkactivity', $type, $vb_name, $data, $target_users_roles);
+}

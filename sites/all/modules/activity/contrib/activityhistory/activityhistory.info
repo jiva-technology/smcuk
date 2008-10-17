@@ -1,0 +1,5 @@
+; $Id: activityhistory.info,v 1.1.2.1 2008/01/21 13:31:04 robertDouglass Exp $
+name = Activity history
+description = Tracks whether a user has been shown a particular activity message
+dependencies = activity
+package = Activity

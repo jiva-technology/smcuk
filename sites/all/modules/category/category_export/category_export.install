@@ -1,0 +1,32 @@
+<?php
+// $Id: category_export.install,v 1.2 2006/04/14 13:52:03 jaza Exp $
+
+/**
+ * @file
+ * Update file for the category_export module. All functions in this
+ * file are implementations of hook_update_N(), unless indicated otherwise.
+ */
+
+/**
+ * Implementation of hook_install().
+ */
+function category_export_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("CREATE TABLE {category_export} (
+        cid int(10) unsigned NOT NULL default '0',
+        export_type varchar(255) NOT NULL default '',
+        PRIMARY KEY (cid, export_type)
+        ) /*!40100 DEFAULT CHARACTER SET utf8 */
+      ");
+      break;
+    case 'pgsql':
+      db_query("CREATE TABLE {category_export} (
+        cid integer NOT NULL default '0',
+        export_type varchar(255) NOT NULL default '',
+        PRIMARY KEY (cid, export_type)
+      )");
+      break;
+  }
+}

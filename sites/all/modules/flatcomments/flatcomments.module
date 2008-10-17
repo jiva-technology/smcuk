@@ -1,0 +1,56 @@
+<?php
+// $Id: flatcomments.module,v 1.5.4.1 2007/11/26 01:56:16 heine Exp $
+
+function flatcomments_help($section) {
+  switch ($section) {
+    case 'admin/modules#description':
+      return t('Forces comments as replies to a node.');
+  }
+}
+
+function flatcomments_form_alter($form_id, &$form) {
+  switch ($form_id) {
+
+    case 'comment_form':
+      // Check whether flatcomments are enabled for this node type and it's not an existing comment
+      // If so, make the node the parent by setting pid to NULL
+      $node = node_load($form['nid']['#value']);
+      if (variable_get("flatcomments_{$node->type}", FALSE) && !$form['cid']['#value']) {
+        $form['pid']['#value'] = NULL;
+      }
+      else if (variable_get("flatcomments_{$node->type}", FALSE) && !user_access('administer comments')) {
+        // Add date to the edit form to prevent a changing timestamp and a different sort order.
+        // Ugly Ugly Ugly
+        $timestamp = db_result(db_query('SELECT c.timestamp FROM {comments} c WHERE c.cid = %d', $form['cid']['#value']));
+        $date = format_date($timestamp, 'custom', 'Y-m-d H:i O');
+        $form['admin']['date'] = array(
+          '#type' => 'value',
+          '#parents' => array('date'),
+          '#value' => $date,
+        );
+      }
+
+      break;
+
+    case 'comment_admin_settings':
+      // Add to the comment settings form on admin/comment/configure
+      $form['flatcomments'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Flat comments'),
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+        '#weight' => -1,            // prevent falling under the save settings button
+        '#description' => t('The node types for which flat comments are enabled.')
+      );
+
+      foreach (node_get_types('names') as $type => $name) {
+        $form['flatcomments']["flatcomments_{$type}"] = array(
+        '#type' => 'checkbox',
+        '#title' => check_plain($name),
+        '#default_value' => variable_get("flatcomments_{$type}", FALSE),
+        );
+      }
+      break;
+
+  }
+}

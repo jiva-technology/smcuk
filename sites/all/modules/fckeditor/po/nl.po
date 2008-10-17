@@ -1,0 +1,202 @@
+# $Id: nl.po,v 1.1.2.1 2007/01/09 14:15:45 heeckhau Exp $
+#
+# LANGUAGE translation of Drupal (fckeditor.module)
+# Copyright YEAR NAME <EMAIL@ADDRESS>
+# Generated from files:
+#  fckeditor.module,v 1.19.2.1 2006/11/21 09:18:15 ontwerpwerk
+#  fckeditor.info,v 1.1 2006/11/13 19:21:39 ontwerpwerk
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"POT-Creation-Date: 2007-01-07 02:17+0100\n"
+"PO-Revision-Date: 2007-01-07 02:39+0100\n"
+"Last-Translator: Frank Van Geirt <fvangeirt@gmail.com>\n"
+"Language-Team: LANGUAGE <EMAIL@ADDRESS>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n" 
+
+#: fckeditor.module:41;102
+msgid ""
+"Enables the usage of FCKeditor (WYSIWYG editor) instead of plain"
+"text fields."
+msgstr ""
+"Laat het gebruik van FCKeditor (WYSIWYG editor) toe in plaats van"
+"de eenvoudige tekstvelden."
+
+#: fckeditor.module:44;49
+msgid ""
+"<p>The FCKeditor module allows Drupal to replace textarea fields with a"
+"rich text or <acronym title=\"What You See Is What You"
+"Get\">WYSIWYG</acronym> editor. This editor brings many of the powerful"
+"functionalities of known desktop editors like Word to the web. It's"
+"relatively lightweight and doesn't require any kind of installation on the"
+"client computer.</p>\n"
+"<p>More information is located at the !fckeditorlink. A small user guide"
+"is located at !userguidelink.</p>"
+msgstr ""
+"<p>De FCKeditor module laat toe om in Drupal de tekstvelden te vervangen"
+"door rich text of een <acronym title=\"What You See Is What You"
+"Get\">WYSIWYG</acronym> editor. Deze editor brengt veel van de functies van"
+"bekende desktop editors zoals Word op het web. Het is relatief licht en"
+"vraagt geen enkele installatie op de lokale computer.</p>\n"
+"<p>Meer informatie is te vinden op !fckeditorlink. Een kleine handleiding"
+"i te vinden op !userguidelink.</p>"
+
+#: fckeditor.module:45;50
+msgid "FCKeditor homepage"
+msgstr "FCKeditor home pagina"
+
+#: fckeditor.module:45;50
+msgid "FCKeditor userguide"
+msgstr "FCKeditor handleiding"
+
+#: fckeditor.module:51
+msgid ""
+"<h3>Configuration</h3>\n"
+"<p>For the Rich Text Editing to work you also need to configure your"
+"!filterlink for the users that may access Rich Text Editing. Either grant"
+"those users Full HTML access or use the following: <code>!filter</code>."
+"Users that need access to tables might be better of using Full HTML.</p>"
+msgstr ""
+"<h3>Configuratie</h3>\n"
+"<p>Om gebruik te kunnen maken van de Rich Text Editing moet je eveneens"
+"de !filterlink voor uw gebruikers configureren zodat ze de vereiste toegang"
+"krijgen. Geef deze gebruikers ofwel de Full HTML toegang of gebruik de"
+"volgende: <code>!filter</code>. Gebruikers die toegang tot tabellen nodig"
+"hebben, gebruiken beter Full HTML.</p>"
+
+#: fckeditor.module:52
+msgid "filters"
+msgstr "filters"
+
+#: fckeditor.module:53
+msgid ""
+"<h3>Security</h3>\n"
+"<p>Note that enabling file uploads is a security risk, please take care"
+"about to who and when you will grant access.</p>"
+msgstr ""
+"<h3>Veiligheid</h3>\n"
+"<p>Weet dat het toelaten van bestanden opladen een gevaar kan zijn. Let"
+"op wie en wanneer je deze toegang geeft.</p>"
+
+#: fckeditor.module:98
+#: fckeditor.info:0
+msgid "FCKeditor"
+msgstr "FCKeditor"
+
+#: fckeditor.module:121
+msgid "Basic settings"
+msgstr "Basis instellingen"
+
+#: fckeditor.module:127
+msgid "Use FCKeditor in a popup window"
+msgstr "Gebruik FCKeditor in een popup venster"
+
+#: fckeditor.module:129
+msgid ""
+"If this option is selected a link to a popup window will be used"
+"instead of a textarea replace."
+msgstr "Indien deze optie geselecteerd wordt, wordt een popup venster gebruikt in plaats van het tekst veld."
+
+#: fckeditor.module:133
+msgid "Default Toolbar"
+msgstr "Standaard knoppenbalk"
+
+#: fckeditor.module:136
+msgid "Choose a default toolbar set."
+msgstr "Kies een standaard knoppenbalk."
+
+#: fckeditor.module:140
+msgid "Advanced Toolbar"
+msgstr "Geavanceerde knoppenbalk."
+
+#: fckeditor.module:143
+msgid "Choose a toolbar set for administrators."
+msgstr "Kies een knoppenbalk voor beheerders."
+
+#: fckeditor.module:149
+msgid "Exclusion settings"
+msgstr "Uitsluiting instellingen"
+
+#: fckeditor.module:155
+msgid "Minimum rows"
+msgstr "Minimum rijen"
+
+#: fckeditor.module:157
+msgid ""
+"Textareas must have a minimum of rows before FCKeditor will be"
+"triggered. Enter '1' if you do not want to use this feature."
+msgstr ""
+"Tekstvelden moeten een minimum aantal rijen hebben vooraleer"
+"FCKeditor wordt geactiveerd. Geef '1' in indien je deze functie niet wenst"
+"te gebruiken."
+
+#: fckeditor.module:166
+msgid "Exclude fields"
+msgstr "Sluit velden uit"
+
+#: fckeditor.module:170
+msgid ""
+"Names (HTML ID's) of fields that may not have an FCKeditor"
+"(separated by commas, spaces or newlines. You may also use * for a"
+"wildcard)"
+msgstr ""
+"Namen (HTML ID's) van velden die geen FCKeditor mogen hebben. De"
+"namen moeten worden gescheiden met komma's, spaties of nieuwe regels. Het"
+"gebruik van * voor jokers is toegelaten."
+
+#: fckeditor.module:176
+msgid "Advanced settings"
+msgstr "Geavanceerde instellingen"
+
+#: fckeditor.module:182
+msgid "Start the toolbar expanded"
+msgstr "Start met de knoppenbalk uitgeschoven"
+
+#: fckeditor.module:184
+msgid "The toolbar start expanded or collapsed."
+msgstr "De knoppenbalk start uitgeschoven of dichtgeklapt."
+
+#: fckeditor.module:188
+msgid "Width"
+msgstr "Breedte"
+
+#: fckeditor.module:190
+msgid "Width in pixels or percent. Ex: 400 or 100%"
+msgstr "Breedte in pixels of percentage. B.v. 400 of 100%"
+
+#: fckeditor.module:268
+msgid "Open rich editor"
+msgstr "Open rich text editor"
+
+#: fckeditor.module:71
+msgid "use default fckeditor"
+msgstr "gebruik standaard dcfeditor"
+
+#: fckeditor.module:71
+msgid "use advanced fckeditor"
+msgstr "gebruik geavanceerde fckeditor"
+
+#: fckeditor.module:71
+msgid "allow fckeditor file uploads"
+msgstr "laat fckeditortoe bestanden opladen"
+
+#: fckeditor.module:0
+msgid "fckeditor"
+msgstr "fckeditor"
+
+#: fckeditor.info:0
+msgid ""
+"Enables the usage of FCKeditor (WYSIWYG) instead of plain text"
+"fields."
+msgstr ""
+"Laat het gebruik van FCKeditor (WYSIWYG editor) toe in plaats van"
+"de eenvoudige tekstvelden."
+
+#: fckeditor.info:0
+msgid "Input helpers"
+msgstr "Invoer hulp"
+

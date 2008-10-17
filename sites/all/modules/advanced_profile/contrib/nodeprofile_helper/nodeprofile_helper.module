@@ -1,0 +1,142 @@
+<?php
+
+/**
+ * Implementation of hook_menu().
+*/
+function nodeprofile_helper_menu($may_cache) {
+  $items = array();
+    global $user;  
+  
+    if (arg(0) == 'user' && is_numeric(arg(1))) {
+      $typenames = variable_get('advanced_profile_typenames','');
+      if (!empty($typenames)) {
+        $account = user_load(array('uid' => arg(1)));
+        $alltypes = nodeprofile_get_types('types');
+        
+        foreach($typenames as $typename) {
+          // Add tab for edit profile
+          $items[] = array(
+          'path' => "user/". arg(1) ."/edit-$typename",
+          'title' => t("Edit " . $alltypes[$typename]->name),
+          'callback' => 'nodeprofile_helper_nodeprofile_node',
+          'access' => (($user->uid == $account->uid)  && user_access("edit own $typename content")) || user_access("edit $typename content"),
+          'type' => MENU_LOCAL_TASK,
+          'callback arguments' => array(arg(1),$typename),
+        );
+        }
+      }
+    }
+  return $items;
+}
+
+/**
+ * Returns the path to the add or edit form for uprofile
+ */
+function nodeprofile_helper_nodeprofile_node($uid, $typename) {
+
+  global $user;  
+
+  $node = node_load(array('type' => $typename, 'uid' => $uid ? $uid : $user->uid));
+
+  if (!$node) {
+    // show add form
+    return node_add($typename);
+  } else {
+    if (node_access('update', $node)) {
+      //show edit form
+      return node_page_edit($node);
+    } else {
+      drupal_access_denied();
+    }
+  }
+}
+
+/**
+ * Redirects user to user page after editing profile
+ */
+function nodeprofile_helper_form_alter($form_id, &$form) {
+  if (arg(0) == 'user' && is_numeric(arg(1))) {
+    $typenames = variable_get('advanced_profile_typenames',''); 
+    if (!empty($typenames)) {
+      $typeforform = str_replace('_node_form','',$form_id);
+      if (in_array($typeforform,$typenames)) {
+        $form['#redirect'] = 'user/' . arg(1);
+      }
+    }
+  }
+}
+
+/*** This function sets the title of the nodeprofile to the username when on the registration screen ***/
+/*** Auto nodetitles doesn't seem to work at this point. ***/
+/*
+ * Implementation of hook_nodeapi
+ */
+function nodeprofile_helper_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+  global $new_account;
+
+  //Set the correct title for new nodes created during registration
+  if ($op == 'submit' && is_nodeprofile($node->type) && isset($new_account)) {
+    $node->title = $new_account->name;
+  }
+}
+
+/************************* BEGIN PANELS INTEGRATION **************************/
+
+// This is now included in the dev version of nodeprofile. Once it is in the 
+// official version, this can be taken out. For now, check for the existance
+// of the file to avoid duplicating.
+if (!file_exists(drupal_get_path('module', 'nodeprofile') . '/nodeprofile_panels.inc')) {
+  /**
+   * Plugin to provide an relationship handler for node from user
+   */
+  function nodeprofile_helper_panels_relationships() {
+    $args['node_from_user'] = array(
+      'title' => t("Nodeprofile from user"),
+      'keyword' => 'nodeprofile',
+      'description' => t('Adds a nodeprofile from user context'),
+      'required context' => new panels_required_context(t('User'), 'user'),
+      'context' => 'nodeprofile_helper_panels_context',
+      'settings form' => 'nodeprofile_helper_panels_settings_form',
+      'settings form validate' => 'nodeprofile_helper_panels_settings_form_validate',
+    );
+    return $args;
+  }
+
+  /**
+   * Return a new context based on an existing context
+   */
+  function nodeprofile_helper_panels_context($context = NULL, $conf) {
+    // If unset it wants a generic, unfilled context, which is just NULL
+    if (empty($context->data)) {
+      return panels_context_create_empty('node', NULL);
+    }
+
+    if (isset($context->data->uid)) {
+      // Load the node for the requested type
+      $uid = $context->data->uid;
+      $nodeprofilenode = nodeprofile_load($conf['type'], $uid);
+     
+      // Send it to panels
+      return panels_context_create('node', $nodeprofilenode);
+    } else {
+      return panels_context_create_empty('node', NULL);
+    }   
+  }
+
+  /**
+   * Settings form for the relationship
+   */
+  function nodeprofile_helper_panels_settings_form($conf) {
+    $options = nodeprofile_get_types('names');
+    $form['type'] = array(
+      '#type' => 'select',
+      '#title' => t('Relationship type'),
+      '#options' => $options,
+      '#default_value' => $conf['type']
+    );
+
+    return $form;
+  }
+}
+
+/************************* END PANELS INTEGRATION **************************/

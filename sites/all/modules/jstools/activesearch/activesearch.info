@@ -1,0 +1,5 @@
+; $Id: activesearch.info,v 1.1.2.3 2007/08/08 21:26:09 nedjo Exp $
+name =  Active Search
+description = Adds AJAX to standard Drupal search.
+package = Javascript tools
+dependencies = jstools tabs search

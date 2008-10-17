@@ -1,0 +1,3 @@
+; $Id: chatroom.info,v 1.1.2.4 2007/06/28 12:09:20 darrenoh Exp $
+name = Chat Room
+description = Enables the creation of rooms that provide access to chats and chat archives.

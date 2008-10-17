@@ -1,0 +1,4 @@
+; $Id: subscriptions.info,v 1.1.4.3 2008/01/18 21:47:25 chx Exp $
+name = Subscriptions
+description = The basic Subscriptions framework.
+package = "Subscriptions"

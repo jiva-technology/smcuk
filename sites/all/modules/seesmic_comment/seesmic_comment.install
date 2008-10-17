@@ -1,0 +1,45 @@
+<?php
+// $Id
+/**
+ * @file
+ * Installation for seesmic_comment module
+ *
+ * @author Sergey Bozhko (eDrupal.fr) and Aleksey Tkachenko (eDrupal.fr)
+ */
+
+/**
+ * Implementation of hook_install
+ *
+ */
+function seesmic_comment_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("CREATE TABLE if not exists {seesmic_comments} (
+                scid INT(10) UNSIGNED NOT NULL PRIMARY KEY,
+                cid INT UNSIGNED NOT NULL,
+                seesmic_video_id VARCHAR(255) NOT NULL,
+				status INT UNSIGNED NOT NULL,
+                KEY cid (cid)
+                ) /*!40100 DEFAULT CHARACTER SET utf8 */;");
+      break;
+    }
+}
+
+/**
+ * Implementation of hook_uninstall
+ *
+ */
+function seesmic_comment_uninstall() {
+  db_query('DROP TABLE {seesmic_comments}');
+  variable_del('seesmic_comment_enabled');
+}
+
+/**
+ * Implementation of hook_updateN
+ *
+ */
+function seesmic_comment_update_1() {
+	db_query('ALTER TABLE {seesmic_comments} ADD `status` TINYINT NOT NULL');
+  return array();
+}

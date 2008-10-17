@@ -1,0 +1,5 @@
+; $Id: category_menu.info,v 1.1 2007/01/05 15:31:15 jaza Exp $
+name = Category menu
+description = Creates and manages a set of menu items that correspond to your site's category hierarchy.
+package = Category
+dependencies = category

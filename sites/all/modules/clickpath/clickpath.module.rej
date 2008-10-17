@@ -1,0 +1,32 @@
+***************
+*** 2,13 ****
+  // $Id: clickpath.module,v 1.1.2.1.2.2 2007/12/12 04:44:39 eaton Exp $
+  
+  /**
+- *experimental add back port of D6 functionality
+- **/
+- 
+- include_once ("clickpath.inc");
+- 
+- /**
+   * @file
+   * Saves and displays the user's most recently visited links in the site.
+   *
+--- 2,7 ----
+  // $Id: clickpath.module,v 1.1.2.1.2.2 2007/12/12 04:44:39 eaton Exp $
+  
+  /**
+   * @file
+   * Saves and displays the user's most recently visited links in the site.
+   *
+***************
+*** 184,187 ****
+      }
+      $_SESSION['clickpath'] = $clickpath;
+    }
+- }
+--- 178,181 ----
+      }
+      $_SESSION['clickpath'] = $clickpath;
+    }
++ }

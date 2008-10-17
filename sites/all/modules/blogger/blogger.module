@@ -1,0 +1,385 @@
+<?php
+// $Id: blogger.module,v 1.129 2006/09/10 11:04:00 wendy Exp $
+
+/**
+ * @file
+ * The Blogger module displays list of bloggers.
+ */
+
+/**
+ * Implementation of hook_help().
+ */
+function blogger_help($section) {
+  switch ($section) {
+    case 'admin/help#blogger':
+      $output = '<p>'. t('The Blogger module displays a list of bloggers.') .'</p>';
+      $output .= t("<p>You can configure:"
+	             ."<ul>"
+				 ."<li>How many bloggers will displayed.</li>"
+				 ."<li>Show numbers of Blogs.</li>"
+				 ."<li>Order by none, name or numbers of blogs.</li>"
+				 ."<li>Upper, small or wordcas.e</li>"
+				 ."<li>All bloggers in page format with pagination support.</li>"
+				 ."<li>Whether display Avatar or not.</li>"
+				 ."</ul>"
+				 ."</p>");
+      return $output;
+    case 'admin/modules#description':
+      return t('Displays list of bloggers.');
+  }
+}
+
+/**
+ * Implementation of hook_perm
+ */
+function blogger_perm() {
+  return array('access blogger', 'administer blogger');
+}
+
+function blogger_admin_settings() {
+
+  // only administrators can access this function
+  
+  // Generate the form - settings applying to all patterns first
+  $form['blogger_settings'] = array(
+    '#type' => 'fieldset',
+    '#weight' => -20,
+    '#title' => t('Basic settings'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE
+  );
+    
+  $form['blogger_settings']['blogger_maxdisp'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Maximum number of bloggers'),
+	'#default_value' => variable_get('blogger_maxdisp', 10),
+    '#description' => t("The maximum number of bloggers to display in the block."),           
+    '#maxlength' => '5', '#size' => '5');
+ 
+  $form['blogger_settings']['blogger_shownum'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Show number of written blogs.'),
+	'#default_value' => variable_get('blogger_shownum', 0),
+    '#description' => t("Display how many blogs has been written, i.e: Samuel(7), Linda(10)."),           
+    '#maxlength' => '1', '#size' => '1');
+    
+  $form['blogger_settings']['blogger_order'] = array(
+    '#type' => 'radios',
+    '#title' => t('Order by'),
+	'#default_value' => variable_get('blogger_order', 0),
+	'#options' => array(t('none'), t('Name'), 
+          t('Blog Count'), t('Date'), t('Random')), 
+    '#description' => t("Order by none, Name or Numbers of blogs.")
+	);
+	
+  $form['blogger_settings']['blogger_case'] = array(
+    '#type' => 'select',
+    '#title' => t('Case format'),
+	'#default_value' => variable_get('blogger_case', 0),
+	'#options' => array(t('None'), t('Smallcase'), t('Uppercase'), t('Wordcase')), 
+    '#description' => t("Change case format of the blogger's name.")
+	);    
+
+  $form['blogger_settings_advanced'] = array(
+    '#type' => 'fieldset',
+    '#weight' => -15,
+    '#title' => t('Advanced settings'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE
+  );
+  
+  $form['blogger_settings_advanced']['blogger_on_blog_only'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Show Blogger module when content type is blog only.'),
+	'#default_value' => variable_get('blogger_on_blog_only', 0),
+    '#description' => t("Show Blogger module when content type is blog only, otherwise hide this module."),           
+    '#maxlength' => '1', '#size' => '1');
+    
+  $form['blogger_settings_advanced']['blogger_exclude'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Exlude these UIDs'),
+	'#default_value' => variable_get('blogger_exclude', "'0'"),
+    '#description' => t("Exclude any UIDs, i.e to exlude user with UID 5 and 7: '5','7'<br/><b>CAUTION:</b> to display all blogger don't make this field blank, instead fill with: '0'"));	
+    
+  $form['blogger_settings_avatar'] = array(
+    '#type' => 'fieldset',
+    '#weight' => -10,
+    '#title' => t('Avatar settings'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE
+  );
+  	
+  $form['blogger_settings_avatar']['blogger_avatar'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Show blogger\'s avatar.'),
+	'#default_value' => variable_get('blogger_avatar', 0),
+    '#description' => t("Display blogger's avatar. The avatar file will displayed on block and page."),           
+    '#maxlength' => '1', '#size' => '1');
+    
+  $form['blogger_settings_avatar']['blogger_avatar_width'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Avatar width'),
+	'#default_value' => variable_get('blogger_avatar_width', 20),
+    '#description' => t("Set avatar width in px. Set to 0 (zero) if you want to use original width. If you want to set 200 px width then just enter 200 (without px). Tip: to keep picture aspect ratio then you can set the width to certain value but set to 0 (zero) the height value."),
+    '#maxlength' => '5', '#size' => '5');
+    
+  $form['blogger_settings_avatar']['blogger_avatar_height'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Avatar height'),
+	'#default_value' => variable_get('blogger_avatar_height', 20),
+    '#description' => t("Set avatar height in px. Set to 0 (zero) if you want to use original height."),
+    '#maxlength' => '5', '#size' => '5');
+  //return $form;
+  return system_settings_form($form);
+}
+
+
+/**
+ * Menu callback. Prints a listing of active nodes on the site.
+ */
+
+function blogger_menu($may_cache) {
+  // Add main CSS functionality.
+  drupal_add_css(drupal_get_path('module', 'blogger') .'/blogger.css');
+  $items = array();
+  
+  $items[] = array(
+      'path' => 'admin/settings/blogger',
+      'title' => t('Blogger'),
+      'description' => t('Control how blogger displayed.'),
+      'callback' => 'drupal_get_form',
+      'callback arguments' => array('blogger_admin_settings'),
+      'access' => user_access('administer blogger'),
+      'type' => MENU_NORMAL_ITEM);
+
+  $items[] = array(
+      'path' => 'blogger/list',
+      'title' => t('Blogger'),
+      'callback' => 'blogger_page_list',
+      'access' => user_access('access blogger'),
+      'type' => MENU_CALLBACK);
+      
+  return $items;
+}
+
+/**
+ * Implementation of hook_block().
+ *
+ * Generates blogger block
+ */
+function blogger_block($op = 'list', $delta = 0) {
+  if ($op == 'list') 
+  {
+    $blocks[0]['info'] = t('Bloggers');
+    return $blocks;
+  }
+  
+  if ($op == 'view' && user_access('access blogger')) 
+  {
+	$maxdisp  = variable_get("blogger_maxdisp", 10);	
+	$shownum  = variable_get("blogger_shownum", 0);  
+	$blogger_order   = variable_get("blogger_order", 0); 
+	$blogger_exclude = variable_get("blogger_exclude", "'0'");
+	
+	$blogger_case   = variable_get("blogger_case", 0); 
+	$blogger_avatar = variable_get("blogger_avatar", 0);
+	$blogger_avatar_width  = variable_get("blogger_avatar_width", 20);
+	$blogger_avatar_height = variable_get("blogger_avatar_height", 20);
+	$blogger_on_blog_only  = variable_get("blogger_on_blog_only", 0);
+	
+	if ($blogger_on_blog_only) {
+	  if (arg(0) != 'blog') {
+	    if (arg(0) == 'node' && is_numeric(arg(1))) {
+          $node = node_load(arg(1));
+          $content_type = $node->type;
+          if ($content_type!='blog') {return FALSE;}	
+	    } else {
+		  return FALSE;
+		}
+	  }	
+	}
+	
+    $sql = " SELECT n.uid, u.name, count(u.name) AS numitems, u.picture "
+	      ." FROM {node} n "
+	      ." INNER JOIN {users} u ON u.uid = n.uid "
+		  ." WHERE n.type = 'blog' and n.status = 1 "
+		  ." and n.uid not in ($blogger_exclude) "
+		  ." GROUP BY n.uid"
+		  .($blogger_order<>0 ? " ORDER BY " : "")
+		  .($blogger_order==1 ? "u.name" : "")
+		  .($blogger_order==2 ? "numitems DESC, u.name" : "")
+		  .($blogger_order==3 ? "n.created DESC, u.name" : "")
+		  .($blogger_order==4 ? "RAND()" : "")
+		  ." LIMIT $maxdisp"
+		  ;
+    $results = db_query($sql);
+	
+	$block_content = '<div id="blogger">';
+	
+	if (!db_num_rows($results)) {
+	  $block_content .= 'No blogger';
+	  $block_content .= '</div>';
+    } else { 
+	
+	$block_content .= '<table>';
+	$i = 0;
+    while ( $data = db_fetch_object($results) ) {
+      $i++;
+      switch ($blogger_case)  {
+        default:
+        case 0:
+          break;
+        case 1: //smallcase
+          $data->name = strtolower($data->name);
+          break;
+        case 2: //uppercase
+          $data->name = strtoupper($data->name);
+          break;
+        case 3: //Wordcase
+          $data->name = ucwords($data->name);
+          break;
+      }
+      $showdata = ($shownum ? $data->name.' ('.$data->numitems.')' : $data->name);
+      
+      if (($blogger_avatar) AND ($data->picture<>"")) { 
+	    $blogger_img = base_path().$data->picture;
+	    $showpict = "<img src='$blogger_img' "
+		            .($blogger_avatar_width<>0 ?  " width=$blogger_avatar_width " : " ")
+					.($blogger_avatar_height<>0 ? " height=$blogger_avatar_height " : " ")  
+		            ."></>";
+	  } else { 
+	    $showpict = ""; 
+	  }
+      
+      $block_content .= '<tr class="'.(($i % 2) ? 'odd' : 'even') .'">';
+      if ($blogger_avatar) {
+	    $block_content .= '<td '.($blogger_avatar_width<>0 ?  " width=$blogger_avatar_width " : " ").'>'.$showpict.'</td>';	
+	  }
+	  
+      $block_content .= '<td>'. l($showdata, "blog/$data->uid").'</td>';
+      $block_content .= '</tr>';
+      
+      //$block_content = 'ssadsdsd 123';
+    }
+    $block_content .= '</table>';
+    $block_content .= '</div>';
+    
+    // add a more link to our page that displays all the links 
+    $block_content .= 
+         '<div class="more-link">'.
+         l(t("more"), "blogger/list", array("title" => t("More bloggers..."))) 
+         .'</div>';
+        
+	}
+	
+	$block['subject'] = t('Bloggers'); 
+	$block['content'] = $block_content;	  
+    return $block;
+  }
+}
+
+function blogger_page_list() 
+{    
+  $maxdisp  = 25;	
+  $shownum  = variable_get("blogger_shownum", 0);  
+  $blogger_order  = variable_get("blogger_order", 0);
+  $blogger_exclude = variable_get("blogger_exclude", "'0'");
+   
+  $blogger_case   = variable_get("blogger_case", 0); 
+  $blogger_avatar = variable_get("blogger_avatar", 0); 
+  $blogger_avatar_width = variable_get("blogger_avatar_width", 0);
+  $blogger_avatar_height = variable_get("blogger_avatar_height", 0);
+  
+  $sql_counts = " SELECT DISTINCT (u.name)"
+	           ." FROM {users} u"
+	           ." INNER JOIN {node} n ON n.uid=u.uid"
+	           ." WHERE u.name<>'' AND n.type='blog' AND n.status=1"
+		       ;
+  $dse_sql_counts = db_query($sql_counts);
+  $cnt_sql_counts = db_num_rows($dse_sql_counts);
+  $sql_counts = "SELECT $cnt_sql_counts";
+	
+  $sql = " SELECT n.uid, u.name, count(u.name) AS numitems, u.picture, n.title "
+      ." FROM {node} n "
+      ." INNER JOIN {users} u ON u.uid = n.uid "
+	  ." WHERE n.type = 'blog' AND n.status=1 "
+	  ." and n.uid not in ($blogger_exclude) "
+	  ." GROUP BY n.uid"
+	  .($blogger_order<>0 ? " ORDER BY " : "")
+	  .($blogger_order==1 ? "u.name" : "")
+	  .($blogger_order==2 ? "numitems DESC, u.name" : "")
+	  .($blogger_order==3 ? "n.created DESC, u.name" : "")
+	  .($blogger_order==4 ? "RAND()" : "")
+	  ;
+  $sql = db_rewrite_sql($sql);
+	
+  //$results = pager_query($sql, 1, 0, $sql_count, COMMENT_PUBLISHED, $uid, $uid);
+  $results = pager_query($sql, $maxdisp, 0, $sql_counts);
+	
+  $i=1;
+  while ($node = db_fetch_object($results)) {  
+    //l($node->title, "node/$node->nid") .' '. theme('mark', node_mark($node->nid, $node->changed)),
+    switch ($blogger_case)  
+	{
+      default:
+      case 0:
+        break;
+      case 1: //smallcase
+        $node->name = strtolower($node->name);
+        break;
+      case 2: //uppercase
+        $node->name = strtoupper($node->name);
+        break;
+      case 3: //Wordcase
+        $node->name = ucwords($node->name);
+        break;
+    }
+      
+    //Latest blog
+	$sql = " SELECT n.title, nid "
+	      ." FROM {node} n "
+		  ." WHERE n.uid = '$node->uid' AND n.type='blog' AND n.status=1"
+		  ." ORDER BY n.created DESC"
+		  ." LIMIT 1"
+		  ;
+    $latest_blogs = db_query($sql);
+    $latest_blog  = db_fetch_object($latest_blogs);
+	//  
+	if (($blogger_avatar) AND ($node->picture<>"")) 
+	{ 
+	  $blogger_img  = base_path().$node->picture;
+	  $showpict = "<img src='$blogger_img' align='center'"
+	           .($blogger_avatar_width<>0 ?  " width=$blogger_avatar_width " : " ")
+	  		   .($blogger_avatar_height<>0 ? " height=$blogger_avatar_height " : " ")  
+		       ."></>";
+	}
+	else
+	{ $showpict = ""; }
+	//  
+    if (!$blogger_avatar)
+	{  
+      $rows[] = array(
+        l($node->name, "blog/$node->uid"),
+        $node->numitems,
+        l($latest_blog->title, "node/$latest_blog->nid")
+      );
+    } else {
+	  $rows[] = array(
+        l($node->name, "blog/$node->uid"),
+        $node->numitems,
+        l($latest_blog->title, "node/$latest_blog->nid"),
+		"$showpict"
+	  );
+	}
+  }
+  if (!$blogger_avatar) { $header = array( t('Name'), t('Numbers of Blogs'),t('Latest Blog') ); }
+  else { $header = array( t('Name'), t('Numbers of Blogs'),t('Latest Blog'), t('Avatar') ); }
+
+  $output = '<div id="blogger">';
+  $output .= theme('table', $header, $rows);
+  $output .= theme('pager', NULL, $maxdisp, 0);
+  $output .= '</div>';
+
+  return $output;
+}
+

@@ -1,0 +1,6 @@
+; $Id: activitystream_delicious.info,v 1.1.2.1 2008/04/09 05:30:40 akalsey Exp $
+
+name = Delicious Bookmarks
+description = Your links on Delicious
+dependencies = activitystream activitystream_feed
+package = Activity Stream

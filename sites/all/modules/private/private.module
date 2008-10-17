@@ -1,0 +1,200 @@
+<?php
+// $Id: private.module,v 1.1.2.1 2007/01/10 04:31:57 eaton Exp $
+
+/**
+ * @file
+ * This is an example illustrating how to restrict access to nodes based on 
+ * some criterion associated with the user.
+ *
+ * This example module will simply set a single flag on a node: 'private'. If
+ * the flag is set, only users with the 'view private content' flag can see
+ * the node, and all users with 'edit private content' can edit (but not 
+ * delete) the node.
+ *
+ * Additionally we will ensure that the node author can always view, edit,
+ * and delete the node by providing an additional access realm that grants
+ * privileges to the node's author.
+ *
+ * Database definition:
+ * @code
+ *   CREATE TABLE private (
+ *     nid int(10) unsigned NOT NULL default '0' PRIMARY KEY,
+ *     private int,
+ *     KEY `node_example_nid` (nid)
+ *   )
+ * @endcode
+ */
+
+
+/**
+ * Implementation of hook_enable().
+ *
+ * A node access module needs to force a rebuild of the node access table
+ * when it is enabled to ensure that things are set up.
+ */
+function private_enable() {
+  node_access_rebuild();
+}
+
+/**
+ * Implementation of hook_disable().
+ *
+ * A node access module needs to force a rebuild of the node access table
+ * when it is disabled to ensure that its entries are removed from the table.
+ */
+function private_disable() {
+  private_disabling(TRUE);
+  node_access_rebuild();
+}
+
+/**
+ * Simple function to make sure we don't respond with grants when disabling
+ * ourselves.
+ */
+function private_disabling($set = NULL) {
+  static $disabling = false;
+  if ($set !== NULL) {
+    $disabling = $set;
+  }
+  return $disabling;
+}
+
+/**
+ * Implementation of hook_perm().
+ *
+ * In this example, we will use a simple permission to determine whether a user
+ * has access to "private" content. This permission is defined here.
+ */
+function private_perm() {
+  return array('mark content as private', 'access private content', 'edit private content');
+}
+
+/**
+ * Implementation of hook_node_grants().
+ *
+ * Tell the node access system what GIDs the user belongs to for each realm.
+ * In this example, we are providing two realms: the example realm, which
+ * has just one group id (1) and the user is either a member or not depending
+ * upon the operation and the access permission set.
+ *
+ * We are also setting up a realm for the node author, though, to give it
+ * special privileges. That has 1 GID for every UID, and each user is
+ * automatically a member of the group where GID == UID.
+ *
+ */
+function private_node_grants($account, $op) {
+  if ($op == 'view' && user_access('access private content', $account)) {
+    $grants['example'] = array(1);
+  }
+
+  if (($op == 'update' || $op == 'delete') && user_access('edit private content', $account)) {
+    $grants['example'] = array(1);
+  }
+
+  $grants['example_author'] = array($account->uid);
+  return $grants;
+}
+
+/**
+ * Implementation of hook_node_access_records().
+ *
+ * All node access modules must implement this hook. If the module is
+ * interested in the privacy of the node passed in, return a list
+ * of node access values for each grant ID we offer. Since this
+ * example module only offers 1 grant ID, we will only ever be
+ * returning one record.
+ */
+function private_node_access_records($node) {
+  if (private_disabling()) {
+    return;
+  }
+
+  // We only care about the node if it's been marked private. If not, it is
+  // treated just like any other node and we completely ignore it.
+  if ($node->private) {
+    $grants = array();
+    $grants[] = array(
+      'realm' => 'example', 
+      'gid' => TRUE, 
+      'grant_view' => TRUE, 
+      'grant_update' => FALSE, 
+      'grant_delete' => FALSE,
+      'priority' => 0,
+    );
+
+    // For the example_author array, the GID is equivalent to a UID, which
+    // means there are many many groups of just 1 user. 
+    $grants[] = array(
+      'realm' => 'example_author', 
+      'gid' => $node->uid, 
+      'grant_view' => TRUE, 
+      'grant_update' => TRUE, 
+      'grant_delete' => TRUE,
+      'priority' => 0,
+    );
+    return $grants;
+  }
+}
+
+/**
+ * Implementation of hook_form_alter()
+ *
+ * This module adds a simple checkbox to the node form labeled private. If the
+ * checkbox is labelled, only the node author and users with 'access private content' 
+ * privileges may see it. 
+ */
+function private_form_alter($form_id, &$form) {
+  if ($form['#id'] == 'node-form') {
+    if (user_access('mark content as private')) {
+      $form['private'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Private'),
+        '#return_value' => 1,
+        '#description' => t('Check here if this content should be set private and only shown to authorized users.'),
+        '#default_value' => $form['#node']->private,
+      );
+    }
+    else {
+      $form['private'] = array(
+        '#type' => 'hidden',
+        '#value' => $form['#node']->private,
+      );
+    }
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ *
+ * - "delete", "insert", and "update":
+ * The module must track the access status of the node.
+ */
+function private_nodeapi(&$node, $op, $arg = 0) {
+  switch ($op) {
+    case 'load':
+      $result = db_fetch_object(db_query('SELECT * FROM {private} WHERE nid = %d', $node->nid));
+      $node->private = $result->private;
+      break;
+    case 'delete':
+      db_query('DELETE FROM {private} WHERE nid = %d', $node->nid);
+      break;
+    case 'insert':
+      db_query('INSERT INTO {private} (nid, private) VALUES (%d, %d)', $node->nid, $node->private);
+      break;
+    case 'update':
+      db_query('UPDATE {private} SET private = %d WHERE nid = %d', $node->private, $node->nid);
+      break;
+  }
+}
+
+function private_link($type, $node = NULL, $teaser = FALSE) {
+  if ($type == 'node' && $node->private) {
+    $links['private_icon']['title'] = theme('private_node_link', $node);
+    $links['private_icon']['html'] = TRUE;
+    return $links;
+  }
+}
+
+function theme_private_node_link($node) {
+  return theme('image', drupal_get_path('module', 'private') . '/icon_key.gif', t('Private'), t('This content is private'));
+}

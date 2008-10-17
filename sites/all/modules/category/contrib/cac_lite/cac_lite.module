@@ -1,0 +1,437 @@
+<?php
+
+/**
+ * @file
+ *
+ * This module provides a simple access control mechanism based
+ * on categories, roles and users.
+ *
+ */
+/*
+CAVEAT
+------
+
+Bear in mind that this module only restricts access to nodes created
+or edited AFTER THIS MODULE IS INSTALLED AND CONFIGURED.
+
+So here's a tip.  (Hopefully, you're starting a new site from
+scratch.) First, create the container(s) you will use to apply
+privacy.  Then, under administer=>cac_lite choose those
+containers.  Then, add the categories within those containers.  Then,
+go back to administer=>cac_lite=>defaults and choose which of
+those categories should be public.  Follow the order carefully and you
+shouldn't have problems.
+
+For more detailed info, read on...
+
+Because Category uses nodes themselves to define categories,
+you may encounter a small chicken and egg problem.
+
+Let's say you create a container called "Privacy" and you enter three
+categories in it, "My Eyes Only", "Authenticated Users" and "General
+Public".  Then you configure this module to use "Privacy" and you
+allow anonymous users access to "General Public" by default, and you
+allow autheniticated users access to both "Authenticated Users" and
+"General Public".  Finally, on your own account you enable "My Eyes
+Only".
+
+Then you create some content and assign some the categories above.
+
+Then you log out, to test as anonymous user.  You find that you cannot
+see the nodes you classified under "My Eyes Only" or "Authenticated
+Users".  However, you can see the actual words "My Eyes Only" and
+"Authenticated Users" in one of your menus.  Shouldn't those be
+completely hidden from anonymous users?  Yes.  Why aren't they?
+
+They aren't hidden because the are nodes created BEFORE
+CAC_LITE WAS CONFIGURED.  All nodes created before this module
+was configured remain visible.  At least that's how it's implented
+right now. So, can we hide those terms?  Yes! Just go in by hand and
+edit each term you think should be hidden.  When you save it, this
+module will notice and add the appropriate restrictions to the
+database.  It's a pain, but that's how it is for now.
+
+*/
+
+/**
+ * Implementation of hook_help
+ */
+function cac_lite_help($section) {
+  switch ($section) {
+  case 'admin/help#cac_lite':
+	$output .= '<p>'.t('This module allows you to restrict access to site content.  It uses a simple scheme based on Categories (the Category module, not the Taxonomy module), Users and Roles.  It uses the node_access table and other features built into Drupal to hide content from unauthorized users.')."</p>\n";
+	$output .= '<p>'.t('While this module has been designed to be as simple as possible to use, there are several steps required to set it up.')."</p>\n";
+	$output .= "<ol>\n";
+	$output.= '<li>'.t('Define one or more categories whose terms will control which users have access.  For example, you could define a category called \'Privacy\' with terms \'Public\' and \'Private\'.')."</li>\n";
+	$output .= '<li>'.t('Tell this module which category or categories control privacy. (!link)', array('!link' => l(t('administer -> access control -> cac_lite'), 'admin/access/cac_lite')))."</li>\n";
+	$output .= '<li>'.t('Grant access to users based on their roles (!link), and/or...', array('!link' => l(t('administer -> access -> cac_lite -> by role'), 'admin/access/cac_lite/roles')))."</li>\n";
+	$output .= '<li>'.t('Grant access to individual users.  (See the cac_lite tab under user -> edit.)')."</li>\n";
+	$output .= '<li>'.t('Finally, if your site contains content, you will need to re-save all nodes.  This ensures that Drupal\'s node_access table is up-to-date.  Otherwise, content submitted before this module was configured will be hidden.')."</li>\n";
+	$output .= "</ol>\n";
+	$output .= '<p>'.t('Currently, this module works with view grants only (no update or delete grants).')."</p>\n";
+	return $output;
+	break;
+  }
+}
+
+
+/**
+ * Implementation of hook_perm().
+ */
+function cac_lite_perm() {
+  return array('administer_cac_lite');
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function cac_lite_menu($may_cache) {
+  global $user;
+  $items = array();
+  $admin_access = user_access('administer_cac_lite');
+
+  if ($may_cache) {
+
+	$items[] = array('path' => 'admin/access/cac_lite',
+					 'title' => t('cac_lite'),
+					 'callback' => 'cac_lite_admin_settings',
+					 'access' => $admin_access,
+					 'type' => MENU_LOCAL_TASK,
+					 'weight' => 1, // after 'roles' tab
+					 );
+	$items[] = array('path' => 'admin/access/cac_lite/settings',
+					 'title' => t('settings'),
+					 'type' => MENU_DEFAULT_LOCAL_TASK,
+					 'weight' => -1,
+					 );
+	$items[] = array('path' => 'admin/access/cac_lite/roles',
+					 'title' => t('access by role'),
+					 'callback' => 'cac_lite_admin_settings_defaults',
+					 'access' => $admin_access,
+					 'type' => MENU_LOCAL_TASK
+					 );
+
+  }
+
+  return $items;
+}
+
+function cac_lite_admin_settings() {
+  // let administrator choose among all containers
+  $options = array();
+  foreach (category_get_containers() as $key => $value) {
+	$options[$key] = $value->title;
+  }
+
+  $form['cac_lite_containers'] =
+	 array('#type' => 'select',
+		   '#title' => 'Containers',
+		   '#default_value' => variable_get('cac_lite_containers', null),
+		   '#options' => $options,
+		   '#description' => t(''),
+		   '#multiple' => true,
+		   );
+
+  $output .= '<p>'.t('Select one or more containers which limit access.')."</p>\n";
+
+  $output .= system_settings_form('cac_lite_admin_settings', $form);
+  return $output;
+}
+
+function cac_lite_admin_settings_defaults() {
+  $cids = variable_get('cac_lite_containers', null);
+
+  $roles = user_roles();
+
+  if (count($cids)) {
+	$all_defaults = variable_get('cac_lite_default_grants', array());
+	$form['cac_lite_default_grants'] =
+	  array('#tree' => true);
+	foreach ($roles as $rid => $role_name) {
+	  $form['cac_lite_default_grants'][$rid] =
+		array('#type' => 'fieldset',
+			  '#tree' => true,
+			  '#title' => t('Access for %role', array('%role' => $role_name)),
+			  // '#description' => t('Users of the \'%role\' role will have these privileges <i>in addition to</i> rights you grant them individually.', array('%role' => $role_name)),
+			  );
+	  $defaults = $all_defaults[$rid];
+	  foreach ($cids as $vid) {
+		$v = category_get_category($vid);
+		$form['cac_lite_default_grants'][$rid][$vid] =
+		  _category_node_select($v->title,
+								$defaults[$vid],
+								$vid,
+								'',
+								true,
+								'<'.t('none').'>');
+	  }
+	}
+	$output .= '<p>'.t('For each role below, select the categories which members of the role are allowed to view.')."</p>\n";
+	$output .= '<p>'.t('You may grant individual users access to categories in addition to those selected here.  See the cac_lite tab on the user edit page.')."</p>\n";
+	$output .= system_settings_form('cac_lite_admin_settings_defaults', $form);
+	return $output;
+  }
+  else {
+	print theme('page',
+				t('First select vocabularies on the cac_lite settings page.'));
+  }
+}
+/**
+ * Implementation of hook_user().
+ */
+
+function cac_lite_user($op, $edit, $account, $category = null) {
+  //drupal_set_message("cac_lite_user($op) called."); // debug
+
+  // only for administrators
+  global $user;
+  if (!user_access('administer_cac_lite'))
+	return;
+
+  switch ($op) {
+  case 'categories':
+	return array(array('name' => 'cac_lite',
+					   'title' => 'cac_lite grants',
+					   ),
+				 );
+	break;
+
+  case 'form':
+	if ($category == 'cac_lite') {
+	  $vids = variable_get('cac_lite_containers', null);
+	  if (count($vids)) {
+		foreach ($vids as $vid) {
+		  $v = category_get_category($vid);
+		  $form['cac_lite']['cac_lite'][$vid] =
+			 _category_node_select($v->title,
+								   $account->cac_lite[$vid],
+								   $vid,
+								   '',
+								   true,
+								   '<'.t('none').'>');
+		}
+	  }
+	  $form['cac_lite'][0] =
+		array('#type' => 'markup',
+			  '#value' => '<p>'.t('You may grant this user view access to any of the terms below.  These grants are in addition to !grant_per_role_link.',
+								  array('!grant_per_role_link' => l(t('access granted to the user by virtue of his/her roles'), 'admin/access/cac_lite/roles'))) . "</p>\n",
+			  '#weight' => -1);
+	  $form['cac_lite']['cac_lite']['#tree'] = true;
+	  return $form;
+	}
+	break;
+  case 'validate':
+	//print_r($edit);
+	//print_r($account);
+	break;
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function cac_lite_nodeapi(&$node, $op, $arg = 0) {
+  //drupal_set_message("cac_lite_nodeapi($op)"); // debug
+  switch ($op) {
+  case 'update':
+  case 'insert':
+	_cac_lite_node_save($node);
+	break;
+  case 'delete':
+	_cac_lite_node_delete($node);
+	break;
+  }
+}
+
+function _cac_lite_node_save(&$node) {
+  //drupal_set_message(theme('devel', $node));
+  // delete any old access control
+  db_query('DELETE FROM {node_access} WHERE nid=%d AND realm=\'%s\'',
+		   $node->nid,
+		   'cac_lite');
+
+  $access_restricted = false;
+
+
+  // we are really interested only in the containers the admin has
+  // selected for access control
+  $cnids = variable_get('cac_lite_containers', null);
+
+  if (!is_array($cnids) || !count($cnids)) {
+	drupal_set_message(t('cac_lite module has been installed, but has not been configured.'));
+	return;
+  }
+
+  // we want to restrict access to this node if the node itself is a term in a restriced category.
+  // will this work?  we have to be called after the data is inserted into category_hierarchy!
+  // perhaps the new module weight can help us out here. TODO!
+  $result = db_query("SELECT * FROM {category_hierarchy} WHERE cid=%d AND parent IN(%s)",
+					 $node->nid, implode(', ', $cnids));
+  if (db_num_rows($result)) {
+	db_query('INSERT INTO {node_access} (nid, gid, realm, grant_view, grant_update, grant_delete) VALUES (%d, %d, \'%s\', %d, %d, %d)',
+			 $node->nid,
+			 $node->nid,
+			 'cac_lite',
+			 1, 0, 0);
+	$access_restricted = true;
+  }
+
+
+  // find all categories associated with this node
+  $node_categories = category_node_get_categories($node->nid, 'cid', true);
+
+  if (count($node_categories) && count($cnids)) {
+	// here, we are restricting access to this node.
+	// let's first check that no other access control module has granted access to everyone
+	db_query('DELETE FROM {node_access} WHERE nid=%d AND gid = 0',
+			 $node->nid);
+	// now grant our privileges
+	foreach ($node_categories as $cid => $category) {
+	  if (in_array($category->cnid, $cnids)) {
+		// flag this node in node_access table
+		db_query('INSERT INTO {node_access} (nid, gid, realm, grant_view, grant_update, grant_delete) VALUES (%d, %d, \'%s\', %d, %d, %d)',
+				 $node->nid,
+				 $cid,
+				 'cac_lite',
+				 1, 0, 0);
+		$access_restricted = true;
+	  }
+	}
+  }
+
+  if (!$access_restricted && count($cnids) && count($node_categories)) {
+	// access has not been restricted by any of the categories this
+	// node is directly associated with.  But what if this node
+	// belongs to a category whos access is restricted by an ancestor
+	// container?  Here we attempt to restrict access in that case, by
+	// inheriting the same restrictions as the category we are
+	// associated with.
+	$cids = array_keys($node_categories);
+	$result = db_query("SELECT na.* from {node_access} na WHERE na.nid IN (%s)", implode(',', $cids));
+	$gids = array();
+	while ($data = db_fetch_object($result)) {
+	  $gids[$data->gid] = $data->gid;
+	}
+	// if any of our categories are restricted access, we inherit the
+	// restriction
+	foreach ($gids as $gid) {
+	  if ($gid != 0) {
+		db_query('INSERT INTO {node_access} (nid, gid, realm, grant_view, grant_update, grant_delete) VALUES (%d, %d, \'%s\', %d, %d, %d)',
+				 $node->nid,
+				 $gid,
+				 'cac_lite',
+				 1, 0, 0);
+		$access_restricted = true;
+	  }
+	}
+  }
+
+  if (!$access_restricted) {
+	// here, the access to the node is not restricted.  At least not by this module.
+	// if no other module is restricting access, it's safe for us to grant access to everyone by inserting grant id 0
+	$result = db_query('SELECT nid FROM {node_access} WHERE nid=%d AND gid != 0',
+					   $node->nid);
+	if (!db_num_rows($result)) {
+	  db_query('INSERT INTO {node_access} (nid, gid, realm, grant_view, grant_update, grant_delete) VALUES (%d, %d, \'%s\', %d, %d, %d)',
+			   $node->nid,
+			   0, // gid = 0 means all users access
+			   'cac_lite',
+			   1, 0, 0);
+
+	}
+  }
+}
+
+function _cac_lite_node_delete(&$node) {
+  db_query('DELETE FROM {node_access} WHERE nid=%d AND realm=\'%s\'',
+		   $node->nid,
+		   'cac_lite');
+}
+
+/**
+ * Return the term ids of terms this user is allowed to access
+ */
+function _cac_lite_user_tids(&$account) {
+  $grants = array();
+  if (count($account->cac_lite)) {
+	// $account->cac_lite is array.  Keys are vids, values are array of tids within that vocabulary, to which the user has access
+	foreach ($account->cac_lite as $tids) {
+	  $grants = array_merge($grants, $tids);
+	}
+  }
+
+  // add default grants in addition to user-specific grants
+  $defaults = variable_get('cac_lite_default_grants', array());
+  foreach ($account->roles as $rid => $role_name) {
+	if (count($defaults[$rid])) {
+	  foreach ($defaults[$rid] as $tids) {
+		$grants = array_merge($grants, $tids);
+	  }
+	}
+  }
+
+  // grant id 0 is reserved for nodes which were not given a grant id when they were created.  By adding 0 to the grant id, we let the user view those nodes.
+  // TODO: make this behavior configurable, to play nicely with other node_access modules which may be installed
+  $grants[] = 0;
+
+  return $grants;
+}
+
+function cac_lite_node_grants(&$account, &$op) {
+  // allow administrators to view all
+  // (relies on drupal's default entry in node_access table.)
+  if (user_access('administer_cac_lite'))
+	$all = array(0);
+  else
+	$all = array(-1);
+
+  $grants = _cac_lite_user_tids($account);
+
+  // TODO: differentiate between view, update, delete
+  return array('all' => $all, // this disables the default setting (view all)
+			   'cac_lite' => $grants);
+}
+
+function cac_lite_db_rewrite_sql($query, $primary_table, $primary_field, $args) {
+  global $user;
+
+  // if administrator, give all access
+  if (user_access('administer_cac_lite')) {
+	return;
+  }
+
+  // the vocabularies containing protected info.
+  $vids = variable_get('cac_lite_containers', array(0));
+
+  // the terms this user is allowed to see
+  $tids = _cac_lite_user_tids($user);
+
+  switch ($primary_field) {
+  case 'cid':
+	// prevent users from seeing terms they do not have permission to read.
+	// this is called during category_get_tree, and possibly other cases.
+
+	// this first clause prevents a user from seeing categories in
+	// protected containers.  Recently a change was made so that the
+	// categories inherit the node access restrictions of parents,
+	// making this clause probably unnecessary.  Worth looking into
+	// later.  For now I do not want to change working code.
+    $join = "LEFT JOIN {category} ca_c ON $primary_table.cid = ca_c.cid";
+    $where = "($primary_table.cid IN (". implode(', ', $tids) .") OR ca_c.cnid NOT IN (". implode(',', $vids) ."))";
+
+	// Categories are also nodes.  So we need a clause that inspects
+	// the node_access table to see if the user can see these
+	// categories.  Because category_get_tree constructs a query where
+	// the primary table is category instead of node.  In my opinion
+	// that is a mistake and will trip up other node_access modules as
+	// well.
+	$join .= " LEFT JOIN {node_access} cac_lite_na ON $primary_table.cid = cac_lite_na.nid";
+	$where .= " AND cac_lite_na.gid IN (".implode(',', $tids).")";
+
+    return array('join' => $join, 'where' => $where);
+    break;
+
+  }
+}
+
+?>

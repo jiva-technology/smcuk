@@ -1,0 +1,5 @@
+; $Id: dynamicload.info,v 1.2.2.3 2007/08/08 21:26:09 nedjo Exp $
+name =  Dynamicload
+description = Enables AJAX-based loading of selected page elements.
+package = Javascript tools
+dependencies = jstools pagearray

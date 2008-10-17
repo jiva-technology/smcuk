@@ -1,0 +1,5 @@
+; $Id: category_outliner.info,v 1.1 2007/01/05 15:31:15 jaza Exp $
+name = Category outliner
+description = Provides an administrative interface for easily editing and re-arranging categories.
+package = Category
+dependencies = category

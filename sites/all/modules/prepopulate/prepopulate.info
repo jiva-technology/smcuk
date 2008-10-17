@@ -1,0 +1,3 @@
+; $Id: prepopulate.info,v 1.1.2.1 2008/03/12 16:40:38 add1sun Exp $
+name = Prepopulate
+description = Allows form elements to be pre-populated from the URL.

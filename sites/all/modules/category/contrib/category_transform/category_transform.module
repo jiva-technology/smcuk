@@ -1,0 +1,238 @@
+<?php
+// $Id: category_transform.module,v 1.5 2007/01/05 15:31:16 jaza Exp $
+
+/**
+ * @file
+ * Allows nodes of any type to be transformed into categories or containers.
+ */
+
+/**
+ * Implementation of hook_perm().
+ */
+function category_transform_perm() {
+  return array('transform posts into categories', 'transform posts into containers');
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function category_transform_menu($may_cache) {
+  $items = array();
+
+  if (!$may_cache) {
+    // To avoid SQL overhead, check whether we are on a node page and whether the
+    // user is allowed to create categories.
+    if (arg(0) == 'node' && is_numeric(arg(1)) && (_category_transform_privileged('transform categories') || _category_transform_privileged('transform containers'))) {
+      $nid = arg(1);
+      $is_cat = category_is_cat_or_cont($nid);
+      $node = node_load($nid);
+      $category = category_get_category($node->nid);
+
+      // Only add the category-tab and container-tab for appropriate pages:
+      $cat_types = array_flip(variable_get('category_transform_node_types_cat', array()));
+      $cont_types = array_flip(variable_get('category_transform_node_types_cont', array()));
+      if (isset($cat_types[$node->type])) {
+        if (empty($category) || $category->cnid) {
+          $items[] = array(
+            'path' => "node/$nid/category-cat",
+            'title' => t('Category'),
+            'callback' => 'category_transform_outline',
+            'callback arguments' => array(arg(1)),
+            'access' => _category_transform_privileged('transform categories'),
+            'type' => MENU_LOCAL_TASK,
+            'weight' => 2,
+          );
+        }
+      }
+      if (isset($cont_types[$node->type])) {
+        if (empty($category) || !$category->cnid) {
+          $items[] = array(
+            'path' => "node/$nid/category-cont",
+            'title' => t('Container'),
+            'callback' => 'category_transform_outline',
+            'callback arguments' => array(arg(1)),
+            'access' => _category_transform_privileged('transform containers'),
+            'type' => MENU_LOCAL_TASK,
+            'weight' => 2,
+          );
+        }
+      }
+    }
+  }
+
+  return $items;
+}
+
+/**
+ * Implementation of hook_category().
+ */
+function category_transform_category($op, $node = NULL) {
+  switch ($op) {
+    case 'settings':
+      // Transform settings
+      $form['category_transform'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Category transform settings'),
+        '#collapsible' => TRUE,
+        '#collapsed' => TRUE,
+      );
+      $options = node_get_types('names');
+      unset($options['category_cat']);
+      unset($options['category_cont']);
+      $form['category_transform']['category_transform_node_types_cat'] = array(
+        '#type' => 'checkboxes',
+        '#title' => t('Node types that can be transformed into categories'),
+        '#default_value' => variable_get('category_transform_node_types_cat', array()),
+        '#options' => $options,
+        '#multiple' => TRUE,
+        '#description' => t('Only the node types that you select here are able to be transformed into categories. Once a node type is selected here, nodes of that type can be transformed by clicking the \'category\' tab, which will be available on the pages for nodes of that type.'),
+      );
+      $form['category_transform']['category_transform_node_types_cont'] = array(
+        '#type' => 'checkboxes',
+        '#title' => t('Node types that can be transformed into containers'),
+        '#default_value' => variable_get('category_transform_node_types_cont', array()),
+        '#options' => $options,
+        '#multiple' => TRUE,
+        '#description' => t('Only the node types that you select here are able to be transformed into containers. Once a node type is selected here, nodes of that type can be transformed by clicking the \'container\' tab, which will be available on the pages for nodes of that type.'),
+      );
+
+      return $form;
+      break;
+  }
+}
+
+/**
+ * Produces the output for the category outline form.
+ *
+ * @param $node
+ *   The node being outlined.
+ * @param $type
+ *   The category type the node is being transformed into (either category_cat
+ *   or category_cont).
+ *
+ * @return
+ *   The form to be rendered by drupal_get_form().
+ */
+function category_transform_outline_form($node, $type) {
+  $form = category_get_form(($type == 'category_cat'), $node, FALSE);
+
+  if (category_is_cat_or_cont($node->nid)) {
+    $form['update'] = array('#type' => 'submit', '#value' => t('Update category outline'));
+    $form['remove'] = array('#type' => 'submit', '#value' => t('Remove from category outline'));
+  }
+  else {
+    $form['add'] = array('#type' => 'submit', '#value' => t('Add to category outline'));
+  }
+
+  return $form;
+}
+
+/**
+ * Handles all category outline operations.
+ */
+function category_transform_outline($nid) {
+  $op = $_POST['op'];
+
+  $node = node_load($nid);
+
+  if ($node->nid) {
+    $arg_cat = arg(2) == 'category-cat' ? 'category_cat' : 'category_cont';
+    $type = category_node_get_type($node, $arg_cat);
+    $category = category_load($node, $type);
+    foreach ($category as $key => $value) {
+      $node->$key = $value;
+    }
+
+    drupal_set_title(check_plain($node->title));
+
+    $output = drupal_get_form('category_transform_outline_form', $node, $type);
+  }
+
+  return $output;
+}
+
+/**
+ * Implementation of hook_form_submit().
+ */
+function category_transform_outline_form_submit($form_id, &$form_values) {
+  $op = $_POST['op'];
+
+  $node = node_load(arg(1));
+  $type = category_node_get_type($node, arg(2));
+  $category = category_load($node, $type);
+
+  if (!isset($form_values['parents']) || !is_array($form_values['parents'])) {
+    $form_values['parents'] = array($form_values['parents']);
+  }
+  if (empty($form_values['parents'][0])) {
+    if ($type == 'category_cat') {
+      $form_values['parents'][0] = $form_values['parent'] = $form_values['cnid'];
+    }
+    else {
+      unset($form_values['parents'][0]);
+    }
+  }
+  if (!isset($form_values['nodes']) || !is_array($form_values['nodes'])) {
+    $form_values['nodes'] = array($form_values['nodes']);
+  }
+  if (empty($form_values['nodes'][0])) {
+    unset($form_values['nodes'][0]);
+  }
+
+  foreach ($category as $key => $value) {
+    $node->$key = $value;
+  }
+  foreach ($form_values as $key => $value) {
+    $node->$key = $value;
+  }
+  $node->date = date('j M Y H:i:s', $node->created);
+
+  $node = node_submit($node);
+
+  $errors = form_get_errors();
+  $no_errors = empty($errors);
+
+  if ($no_errors) {
+    $operations = array(
+      t('Add to category outline'),
+      t('Update category outline'),
+      t('Remove from category outline'),
+    );
+    if (in_array($op, $operations)) {
+      node_save($node);
+    }
+
+    switch ($op) {
+      case t('Add to category outline'):
+        drupal_set_message(t('The post has been added to the category structure.'));
+        break;
+
+      case t('Update category outline'):
+        drupal_set_message(t('The category outline has been updated.'));
+        break;
+
+      case t('Remove from category outline'):
+        drupal_set_message(t('The post has been removed from the category structure.'));
+        break;
+    }
+
+    if (in_array($op, $operations)) {
+      return "node/$node->nid";
+    }
+  }
+}
+
+/**
+ * Makes it easier to assign these common combinations of permissions.
+ * Think of this as a shorthand function for category access control.
+ */
+function _category_transform_privileged($type = 'transform categories') {
+  switch ($type) {
+    case 'transform categories':
+      return user_access('transform posts into categories') || user_access('administer categories');
+    case 'transform containers':
+      return user_access('transform posts into containers') || user_access('administer categories');
+    default:
+      return FALSE;
+  }
+}

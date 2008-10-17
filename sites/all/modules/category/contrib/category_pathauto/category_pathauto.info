@@ -1,0 +1,5 @@
+; $Id: category_pathauto.info,v 1.1 2007/01/05 15:31:16 jaza Exp $
+name = Category pathauto
+description = Allows you to generate URL aliases that conform to your site's category structure.
+package = Category
+dependencies = category pathauto

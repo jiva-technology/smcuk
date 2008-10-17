@@ -1,0 +1,94 @@
+<?php
+// $Id: votingapiactivity.module,v 1.1.2.5 2008/03/19 17:47:48 sirkitree Exp $
+
+/**
+ * Activity definition file
+ *
+ * This defines what hooks activity module should use
+ */
+function votingapiactivity_activity_info() {
+  $tags = array();
+  $query = db_query("SELECT DISTINCT tag FROM {votingapi_cache}");
+  while ($result = db_fetch_array($query)) {
+    $tags[$result['tag']] = $result['tag'];
+  }
+  return array(
+    'ops' => array('mark' => t('Mark')),
+    'types' => $tags,
+    'roles' => array(
+      'author' => array(
+        '#name' => t('Author'),
+        '#description' => t('The person who voted'),
+        '#default' => t('[author] voted on [node-title-link]'),
+      ),
+      'all' => array(
+        '#name' => t('All'),
+        '#description' => t('The general public.'),
+        '#default' => t('[author] voted on [node-title-link]'),
+      ),
+    ),
+  );
+}
+
+/**
+ * Token module integration
+ */
+function votingapiactivity_token_list($type = 'all') {
+  if ($type == 'votingapiactivity') {
+    $tokens['votingapiactivity'] = array('node-id'  => t('Id of the node that was voted upon'),
+      'operation' => t('The verb of the operation that took place'),
+      'author' => t('Person who voted on the node'),
+      'node-title' => t('Title of the node that was voted upon'),
+      'node-title-link' => t('Link to the node that was voted upon'),
+      'node-type' => t('The type of the node that was voted upon'),
+      'author-name' => t('The name of who voted on the node'),
+      'author-vote' => t('Value of the author\'s vote'),
+      'node-vote-avg' => t('Average of all votes for this node'),
+      'node-vote-count' => t('Count of all votes for this node'),
+    );
+    return $tokens;
+  }
+}
+
+function votingapiactivity_token_values($type, $data = NULL, $options = array()) {
+  static $authors;
+  if ($type == 'votingapiactivity' && !empty($data)) {
+    if (!isset($authors[$data['user-id']])) {
+    $author = db_fetch_object(db_query('SELECT uid, name FROM {users} WHERE uid = %d', $data['user-id']));
+      $authors[$data['user-id']] = theme('username', $author);
+    }
+    $data['author'] = $authors[$data['user-id']];
+    $author_vote = db_fetch_object(db_query('SELECT value FROM {votingapi_vote} WHERE uid = %d AND content_id = %d', $data['user-id'], $data['node-id']));
+    $data['author-vote'] = $author_vote->value;
+    $node_votes = db_query('SELECT value, function FROM {votingapi_cache} WHERE content_id = %d', $data['node-id']);
+    while ($row = db_fetch_object($node_votes)) {
+      $node_vote[$row->function] = $row->value;
+    }
+    $data['node-vote-avg'] = $node_vote['average'];
+    $data['node-vote-count'] = $node_vote['count'];
+    $data['node-title-link'] = l($data['node-title'], 'node/'. $data['node-id']);
+    return $data;
+  }
+}
+
+/**
+ * Implementation of hook_votingapi_insert()
+ */
+function votingapiactivity_votingapi_insert() {
+  global $user;
+  $args = func_get_args();
+  $node = node_load($args[0]->content_id);
+  $data = array(
+    'user-id' => $user->uid,
+    'user-name' => $user->name,
+    'node-id' => $args[0]->content_id,
+    'node-title' => $node->title,
+    'rating-value' => $args[0]->value,
+    'rating_type' => $args[0]->value_type,
+  );
+  $target_users_roles = array(
+    ACTIVITY_ALL => 'all',
+    $node->uid => 'author'
+  );
+  activity_insert('votingapiactivity', 'vote', 'mark', $data, $target_users_roles);
+}

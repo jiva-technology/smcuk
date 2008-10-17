@@ -1,0 +1,67 @@
+<?php
+// $Id: nodereview.install,v 1.3 2007/02/25 02:50:10 crell Exp $
+
+function nodereview_install() {
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("CREATE TABLE {nodereview} (
+        nid int unsigned NOT NULL default '0',
+        reviewed_nid int unsigned NOT NULL default '0',
+        PRIMARY KEY  (nid),
+        KEY (reviewed_nid)
+      ) /*!40100 DEFAULT CHARACTER SET utf8 */;");
+      db_query("CREATE TABLE {nodereview_axes} (
+        aid int(11) NOT NULL auto_increment,
+        tag varchar(255) NOT NULL default '',
+        node_type varchar(255) NOT NULL default '',
+        weight int(11) NOT NULL default 0,
+        PRIMARY KEY  (aid)
+      ) /*!40100 DEFAULT CHARACTER SET utf8 */;");
+      db_query("CREATE TABLE {nodereview_reviews} (
+        nid int(11) NOT NULL default 0,
+        aid int(11) NOT NULL default 0,
+        review text NOT NULL,
+        KEY (nid)
+      ) /*!40100 DEFAULT CHARACTER SET utf8 */;");
+      break;
+
+    case 'pgsql':
+      db_query("CREATE TABLE {nodereview} (
+        nid int unsigned NOT NULL default '0',
+        reviewed_nid int unsigned NOT NULL default '0',
+        PRIMARY KEY  (nid),
+        KEY (reviewed_nid)
+      );");
+      db_query("CREATE TABLE {nodereview_axes} (
+        aid int(11) NOT NULL auto_increment,
+        tag varchar(255) NOT NULL default '',
+        node_type varchar(255) NOT NULL default '',
+        weight int(11) NOT NULL default 0,
+        PRIMARY KEY  (aid)
+      );");
+      db_query("CREATE TABLE {nodereview_reviews} (
+        nid int(11) NOT NULL default 0,
+        aid int(11) NOT NULL default 0,
+        review text NOT NULL,
+        KEY (nid)
+      );");
+      break;
+  }
+}
+
+
+function nodereview_uninstall() {
+
+  switch ($GLOBALS['db_type']) {
+    case 'mysql':
+    case 'mysqli':
+      db_query("DROP TABLE {nodereview}}");
+      db_query("DROP TABLE {nodereview_axes}}");
+      db_query("DROP TABLE {nodereview_reviews}");
+      db_query("DELETE FROM {node_type} WHERE type='nodereview'");
+  
+  }
+
+
+}

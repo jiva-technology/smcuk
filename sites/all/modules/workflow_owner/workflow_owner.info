@@ -1,0 +1,5 @@
+; $Id: workflow_owner.info,v 0
+name = Workflow owner
+description = Allow users to be workflow state owners.  Provides views integration and workflow-ng integration
+dependencies = workflow
+package = Workflow

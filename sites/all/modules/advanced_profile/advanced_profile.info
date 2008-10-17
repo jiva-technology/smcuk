@@ -1,0 +1,5 @@
+; $Id $
+name = Advanced Profile Kit
+description = "Provides panels pieces, views, and glue code to put together an advanced user profile"
+dependencies = panels
+
