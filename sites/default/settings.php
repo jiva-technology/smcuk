@@ -95,7 +95,7 @@
  */
 
 $db_url = '';
-$db_prefix = 'edu'; 
+$db_prefix = ''; 
 
 /**
  * Base URL (optional).

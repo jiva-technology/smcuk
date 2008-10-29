@@ -1880,30 +1880,3 @@ msgstr ""
 #: styles/list.inc:15
 msgid "Presents the panes in the form of an HTML list."
 msgstr ""
-
-#: styles/rounded_corners.inc:14
-msgid "Rounded corners"
-msgstr "Abgerundete Ecken"
-
-#: styles/rounded_corners.inc:15
-msgid "Presents the panes with a rounded corner box around them"
-msgstr ""
-
-#: styles/rounded_corners.inc:155
-msgid "Box around"
-msgstr ""
-
-#: styles/rounded_corners.inc:156
-#, fuzzy
-msgid "Each pane"
-msgstr "Panels bearbeiten"
-
-#: styles/rounded_corners.inc:156
-#, fuzzy
-msgid "Each panel"
-msgstr "Panels bearbeiten"
-
-#: styles/rounded_corners.inc:158
-msgid "Choose whether to include the box around each pane (piece of content) or panel (each column or region)"
-msgstr ""
-

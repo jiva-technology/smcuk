@@ -60,7 +60,6 @@
  */
 include_once 'theme-settings-init.php';
 
-
 /**
  * Add a pager at the top of a list of comments.
  */

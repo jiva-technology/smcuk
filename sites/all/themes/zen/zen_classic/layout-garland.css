@@ -61,7 +61,7 @@
   body.two-sidebars #squeeze
   {
     margin-left: 210px;
-    padding-left: 1em;
+    padding-left: 4em;
   }
 
   /* Then we adjust the #main container to make room for the right sidebar */
@@ -89,13 +89,13 @@
 
   #container #sidebar-left
   {
-    width: 210px; /* If you change this value, change the values
+    width: 200px; /* If you change this value, change the values
                      of margin-left for #main and #squeeze. */
   }
 
   #container #sidebar-right
   {
-    width: 210px; /* If you change this value, change the values
+    width: 200px; /* If you change this value, change the values
                      of margin-right for #main and #squeeze. */
   }
 

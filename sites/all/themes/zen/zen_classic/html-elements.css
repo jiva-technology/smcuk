@@ -8,8 +8,10 @@
 /** fonts **/
   body
   {
-    font: 13px Arial, Helvetica, "Bitstream Vera Sans", sans-serif;
-    background: #fff;
+	font-size:75%;
+	color:#333;
+	background:#fff;
+	font-family:"Helvetica Neue", Helvetica, Arial, sans-serif;
   }
 
   /* IE 5 and 6 can't resize text that is specified in pixels. */
@@ -21,8 +23,6 @@
 
   #page
   {
-    font-family: Verdana, "Bitstream Vera Sans", Arial, Helvetica, sans-serif;
-    line-height: 1.5em;
   }
 
   pre, code
@@ -32,84 +32,58 @@
   }
 
 /** headings **/
-  h1
-  {
-    font-size: 140%;
-  }
 
-  h1, h1 a, h1 a:hover
-  {
-    margin: .5em 0 .5em 0;
-    font-family: Arial, Helvetica, "Bitstream Vera Sans", sans-serif;
-    color: #444;
-  }
-
-  h1.title
-  {
-    font-size: 200%;
-  }
-
-  h1.title, h1.title a, h1.title a:hover
-  {
-    font-family: "Trebuchet MS", "Bitstream Vera Sans", Verdana, Arial, Helvetica, sans-serif;
-    font-weight: normal;
-    color: #6191C5;
-    margin: 0;
-    margin-bottom: 0;
-    line-height: normal;
-  }
-
-  h2
-  {
-    font-size: 122%;
-  }
-
-  h2, h2 a, h2 a:hover, .block h3, .block h3 a
-  {
-    color: #444;
-    font-family: Arial, Helvetica, "Bitstream Vera Sans", sans-serif;
-    margin: .5em 0 .5em 0;
-  }
-
-  h3
-  {
-    font-size: 107%;
-    font-weight: bold;
-    font-family: Arial, Helvetica, "Bitstream Vera Sans", sans-serif;
-  }
-
-  h4, h5, h6
-  {
-    font-weight: bold;
-    font-family: Arial, Helvetica, "Bitstream Vera Sans", sans-serif;
-  }
+h1, h2, h3, h4, h5, h6 {
+	font-weight:normal;color:#333;
+	font-family: HelveticaNeue-Light, "Helvetica Neue", Arial, Verdana, sans-serif;
+	font-weight:normal;
+}
+ 
+h1 {font-size:3em;line-height:1;margin-bottom:0.5em;}
+h2 {font-size:2em;margin-bottom:0.75em;}
+h3 {font-size:1.5em;line-height:1;margin-bottom:1em;}
+h4 {font-size:1.2em;line-height:1.25;margin-bottom:1.25em;height:1.25em;}
+h5 {font-size:1em;font-weight:bold;margin-bottom:1.5em;}
+h6 {font-size:1em;font-weight:bold;}
+h1 img, h2 img, h3 img, h4 img, h5 img, h6 img {margin:0;}
 
 /** block-level elements **/
-  p
-  {
-    padding: 0 0 0.5em 0;
-    margin: 0;
-  }
 
-  ol, ul, dl
-  {
-    position: relative;
-  }
+p {margin:0 0 1.5em;}
+p img {float:left;margin:1.5em 1.5em 1.5em 0;padding:0;}
+p img.right {float:right;margin:1.5em 0 1.5em 1.5em;}
 
-  pre
-  {
-    background: #ddd;
-    border: 1px solid #aaa;
-    padding: 0.75em 1.5em;
-  }
+p {margin:0 0 1.5em;}
+p img {float:left;margin:1.5em 1.5em 1.5em 0;padding:0;}
+p img.right {float:right;margin:1.5em 0 1.5em 1.5em;}
+a:focus, a:hover {color:#000;}
+a {color:#009;text-decoration:underline;}
+blockquote {margin:1.5em;color:#666;font-style:italic;}
+strong {font-weight:bold;}
+em, dfn {font-style:italic;}
+dfn {font-weight:bold;}
+sup, sub {line-height:0;}
+abbr, acronym {border-bottom:1px dotted #666;}
+address {margin:0 0 1.5em;font-style:italic;}
+del {color:#666;}
+pre, code {margin:1.5em 0;white-space:pre;}
+pre, code, tt {font:1em 'andale mono', 'lucida console', monospace;line-height:1.5;}
+li ul, li ol {margin:0 1.5em;}
+ul, ol {margin:0 1.5em 1.5em 1.5em;}
+ul {list-style-type:disc;}
+ol {list-style-type:decimal;}
+dl {margin:0 0 1.5em 0;}
+dl dt {font-weight:bold;}
+dd {margin-left:1.5em;}
+table {margin-bottom:1.4em;width:100%;}
+th {font-weight:bold;background:#C3D9FF;}
+th, td {padding:4px 10px 4px 5px;}
+tr.even td {background:#E5ECF9;}
+tfoot {font-style:italic;}
+caption {background:#eee;}
 
-  blockquote
-  {
-    border: 1px #ccc solid;
-    margin: 0.5em 1em;
-    padding: 0.3em;
-    font-style: italic;
-  }
+
+
 
 /** links **/
   /* The order of link states are based on Eric Meyer's article:
@@ -176,5 +150,4 @@
 
   select, input, textarea
   {
-    font: 99% Arial, Helvetica, "Bitstream Vera Sans", sans-serif;
   }

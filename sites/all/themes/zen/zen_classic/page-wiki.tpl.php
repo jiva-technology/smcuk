@@ -14,17 +14,11 @@
   <?php print $scripts; ?>
 </head>
 
-<?php /* different classes allow for separate theming of the home page */ ?>
-
 <body class="<?php print $body_classes; ?>">
   <div id="page">
     <div id="header">
-<div id="wikitoolbar"><b><a href="<?php print url("wiki/main-page");?>" id="toolbarwiki">Wiki</a></b>|<a href="<?php print url("wikichanges");?>" id="toolbarforumunread">Recent Wiki Changes</a>|<a href="<?php print url("wiki_index");?>" id="toolbarwikiinsdex">Wiki Page Index</a>||<a href="<?php print url("user");?>" id="toolbarwikimystuff">My Stuff >></a></div>
-
 <div id="skip-nav"><a href="#content"><?php print t('Skip to Main Content'); ?></a></div>
-
       <div id="logo-title">
-
 <?php print $search_box; ?>
 <?php if (!empty($logo)): ?>
           <a href="<?php print $base_path; ?>" title="<?php print t('Home'); ?>" rel="home">
@@ -32,7 +26,7 @@
           </a>
 <?php endif; ?>
 
-        <div id="name-and-slogan">
+     <div id="name-and-slogan">
 
         <?php if (!empty($site_name)): ?>
           <div id='site-name'><strong>
@@ -64,19 +58,23 @@
 	  <?php print theme('links', $secondary_links); ?>
           </div>
 	  <?php endif; ?>
-      </div> <!-- /navigation -->
-
-      <?php if (!empty($header) || !empty($breadcrumb)): ?>
-        <div id="header-region">
-      <?php print $breadcrumb; ?>
+      </div>
+      
+   		<div class="smc_toolbar" id="wikitoolbar">
+			<a href="<?php print url("wikichanges");?>" id="toolbarforumunread">Recent Wiki Changes</a> | 
+			<a href="<?php print url("wiki_index");?>" id="toolbarwikiinsdex">Wiki Page Index</a> | 
+			<a href="<?php print url('logout');?>">Logout</a>
+			<?php if (!empty($tabs)): ?><div class="tabs"><?php print $tabs; ?></div><?php endif; ?>
+   		</div>
+	<?php if (!empty($header)): ?>
+	<div id="header-region">
       <?php print $header; ?>
-        </div> <!-- /header-region -->
+	</div> <!-- /header-region -->
 	<?php endif; ?>
 
-    </div> <!-- /header -->
-
-    <div id="container" class="clear-block">
-
+    </div> <!-- /header -->  
+    
+<div id="container" class="clear-block">
     <?php if (!empty($sidebar_left)): ?>
         <div id="sidebar-left" class="column sidebar">
     <?php print $sidebar_left; ?>
@@ -92,10 +90,6 @@
       <?php endif; ?>
         <div id="content">
 	<?php if (!empty($title)): ?>
-	<h1 class="wikititle"><?php print $title; ?></h1>
-	<?php endif; ?>
-	<?php if (!empty($tabs)): ?>
-	<div class="tabs"><?php print $tabs; ?></div>
 	<?php endif; ?>
 	<?php print $help; ?>
 	<?php print $messages; ?>
@@ -108,16 +102,14 @@
 	<div id="content-bottom"><?php print $content_bottom; ?></div>
         <?php endif; ?>
       </div></div> <!-- /squeeze /main -->
-
       <?php if (!empty($sidebar_right)): ?>
         <div id="sidebar-right" class="column sidebar">
       <?php print $sidebar_right; ?>
         </div> <!-- /sidebar-right -->
 	<?php endif; ?>
-
-    </div> <!-- /container -->
-
-    <div id="footer-wrapper">
+   </div> <!-- /container -->
+   
+      <div id="footer-wrapper">
       <div id="footer">
     <?php print $footer_message; ?>
       </div> <!-- /footer -->

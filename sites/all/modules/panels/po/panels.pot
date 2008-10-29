@@ -46,7 +46,6 @@
 #  term_parent.inc,v 1.1.2.1 2007/10/20 22:57:01 merlinofchaos
 #  term_from_node.inc,v 1.1.2.2 2007/10/22 23:48:50 merlinofchaos
 #  dnd.inc,v 1.1.2.1 2007/08/29 22:02:04 merlinofchaos
-#  rounded_corners.inc,v 1.1.2.2 2007/10/20 21:03:07 merlinofchaos
 #
 #, fuzzy
 msgid ""
@@ -1744,28 +1743,3 @@ msgstr ""
 #: styles/list.inc:15
 msgid "Presents the panes in the form of an HTML list."
 msgstr ""
-
-#: styles/rounded_corners.inc:14
-msgid "Rounded corners"
-msgstr ""
-
-#: styles/rounded_corners.inc:15
-msgid "Presents the panes with a rounded corner box around them"
-msgstr ""
-
-#: styles/rounded_corners.inc:155
-msgid "Box around"
-msgstr ""
-
-#: styles/rounded_corners.inc:156
-msgid "Each pane"
-msgstr ""
-
-#: styles/rounded_corners.inc:156
-msgid "Each panel"
-msgstr ""
-
-#: styles/rounded_corners.inc:158
-msgid "Choose whether to include the box around each pane (piece of content) or panel (each column or region)"
-msgstr ""
-

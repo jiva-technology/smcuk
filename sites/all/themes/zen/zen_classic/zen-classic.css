@@ -3,125 +3,32 @@
 /*
  * COMMON STYLES
  */
-
-  #forumtoolbar 
-
-  {
-  z-index: 3;
-  background-color: #609ad8;
-  background-repeat: repeat-y;
-  display: block;
-  height: 18px;
-  left: 0pt;
-  position: fixed;
-  right: 0pt;
  
-  }
-  #forumtoolbar a
-  {
-  color: #000000; 
-  }
-  
-  #forumtoolbar a:hover
-  {
-  color: #FFFFFF;
-  background-color: #000000;
-  }
+ /* Simple reset stuff */
+ 
+a, button:focus, input, textarea { outline:none; }
+a img {border:none;}
+strong { font-weight: bold }
+em { font-style: italic }
+input[type="hidden"] {display: none;}
 
-  #blogtoolbar
+.reset { display: block; height: 1px; margin-top: -1px; clear: both;}
+ 
+ /* Toolbars */
+ 
+.smc_toolbar { position:relative; display: block;border-bottom: 2px solid #d4d4d4;padding:1em 0 1em 33px; margin-bottom: 1em; } 
+.smc_toolbar a {color: white; padding:2px 3px;}
+.smc_toolbar a:hover {color: #222; text-decoration: none;}
 
-  {
-  z-index: 3;
-  background-color: #D57BBA;
-  background-repeat: repeat-y;
-  display: block;
-  height: 18px;
-  left: 0pt;
-  position: fixed;
-  right: 0pt;
-  }
+#forumtoolbar { background-color: #609ad8; }
+#blogtoolbar, .page-node-add-blog .smc_toolbar { background-color: #D57BBA; }
+#wikitoolbar, .page-wiki_index .smc_toolbar, .section-category .smc_toolbar{ background-color: #D24444; }
+#socialbookmarktoolbar { background-color: #43C71B; }
+#chatroomtoolbar, .page-node-add-chatroom .smc_toolbar { background-color: #e3af27; }
+#howtotoolbar, .section-slideshow .smc_toolbar, .page-page-how .smc_toolbar { background-color: #57bec7; }
 
-  #blogtoolbar	a
-  {
-  color: #000000;
-  }
+/* Main Structure */
 
-  #blogtoolbar a:hover
-  {
-  color: #FFFFFF;
-  background-color: #000000;
-  }
-
-  #wikitoolbar
-
-  {
-  z-index: 3;
-  background-color: #D24444;
-  background-repeat: repeat-y;
-  display: block;
-  height: 18px;
-  left: 0pt;
-  position: fixed;
-  right: 0pt;
-  }
-   #wikitoolbar	a
-  {
-  color: #000000;
-  }
-
-  #wikitoolbar a:hover
-  {
-  color: #FFFFFF;
-  background-color: #000000;
-  }
-
-  #socialbookmarktoolbar
-
-  {
-  z-index: 3;
-  background-color: #43C71B;
-  background-repeat: repeat-y;
-  display: block;
-  height: 18px;
-  left: 0pt;
-  position: fixed;
-  right: 0pt;
-  }
-
-   #socialbookmarktoolbar a
-  {
-  color: #000000;
-  }
-  
-  #socialbookmarktoolbar a:hover
-  {
-  color: #FFFFFF;
-  background-color: #000000;
-  }
-
- #chatroomtoolbar
-
-  {
-  z-index: 3;
-  background-color: #FFE42D;
-  background-repeat: repeat-y;
-  display: block;
-  height: 18px;
-  left: 0pt;
-  position: fixed;
-  right: 0pt;
-  }
-  
-   #chatroomtoolbar a 
-  {
-  color: #000000;
-  }
-  
-  #chatroomtoolbar a:hover
-  {
-  color: #FFFFFF;
-  background-color: #000000;
-  }
   body
   {
     background: #fff;
@@ -133,31 +40,26 @@
     background-color: #fff;
   }
 
-  a.comment_mover_comment_prune
-  {
-  position: relative;
-  left: -49px;
+  a.comment_mover_comment_prune {
+  	position: relative;
+  	left: -49px;
   }
  
-  a.comment_mover_comment_graft
-  {
-  position: relative;
-  left: -49px;
+  a.comment_mover_comment_graft {
+  	position: relative;
+  	left: -49px;
   }
 
-  #container
-  {
-    margin: 0 10px 10px 10px;
+  #container {
+    margin: 0 3em;
   }
 
   #header-region,
-  #closure-blocks
-  {
+  #closure-blocks {
     margin: 0 10px;
   }
 
-  #main .node .content
-  {
+  #main .node .content {
     color: #333;
   }
 
@@ -191,52 +93,9 @@ ul.tips
  * HEADER STYLES
  */
 
-  h1.blogtitle, h1.blogtitle a, h1.blogtitle a:hover 
-   {
-color:#D57BBA;
-font-family:"Trebuchet MS","Bitstream Vera Sans",Verdana,Arial,Helvetica,sans-serif;
-font-weight:normal;
-line-height:normal;
-margin:0pt;
-font-size: 270%;
-}
-
- h1.wikititle, h1.wikititle a, h1.wikititle a:hover
-   {
-color:#D24444;
-font-family:"Trebuchet MS","Bitstream Vera Sans",Verdana,Arial,Helvetica,sans-serif;
-font-weight:normal;
-line-height:normal;
-margin:0pt;
-font-size: 270%;
-}
-
- h1.socialbookmarktitle, h1.socialbookmarktitle a, h1.socialbookmarktitle a:hover
-   {
-color:#43C71B;
-font-family:"Trebuchet MS","Bitstream Vera Sans",Verdana,Arial,Helvetica,sans-serif;
-font-weight:normal;
-line-height:normal;
-margin:0pt;
-font-size: 270%;
-}
-
- h1.chatroomtitle, h1.chatroomtitle a, h1.chatroomtitle a:hover
-   {
-color:#FFE42D;
-font-family:"Trebuchet MS","Bitstream Vera Sans",Verdana,Arial,Helvetica,sans-serif;
-font-weight:normal;
-line-height:normal;
-margin:0pt;
-font-size: 270%;
-}
-
-
- 
-
   #logo-title
   {
-    margin: 18px 20px 0 20px;
+  	margin: 17px 0 28px 29px;
     position: relative;
   }
 
@@ -259,7 +118,6 @@ font-size: 270%;
 
   #site-name a, #site-name a:hover
   {
-    font-family: "Trebuchet MS", "Bitstream Vera Sans", Verdana, Arial, Helvetica, sans-serif;
     font-weight: normal;
     color: #6DA6E2;
     margin: 0;
@@ -273,13 +131,21 @@ font-size: 270%;
     font-size: 85%;
     margin-left: 20px;
   }
+  
+  .block-inner {
+  	margin-top: 2em;
+  }
+  
+  .block-inner .title {
+  	font-size: 1.2em;
+  }
 
   #search
   {
     position: absolute;
     padding: 0;
-    top: 0;
-    right: 0;
+    top: 44px;
+    right: 33px;
   }
 
   #mission
@@ -295,11 +161,10 @@ font-size: 270%;
 
   .breadcrumb
   {
-    margin: 0;
+  	float:right;
+    margin: 0 23px 0 0;
     padding-top: 4px; 
     padding-bottom: 8px;
-    font-size: 85%;
-    margin-left: 10px; /* #header-region already has 10px */
   }
 
   /* "Skip to Main Content" link
@@ -361,20 +226,10 @@ font-size: 270%;
  * MENU STYLES
  */
 
-  div.menu
-  {
-    margin-top: 15px;
+  div.menu {}
+  #primary{
+  	margin-left: 33px;
   }
-
-  #primary
-  {
-    font-size: 106%;
-    line-height: normal;
-    padding: 0 0 1px 20px;
-    border-bottom:4px solid #2763A5;
-  }
- 
-
 
   #primary ul
   {
@@ -386,180 +241,91 @@ font-size: 270%;
   #primary ul.links li,
   #secondary ul.links li
   {
-    display: inline;
-    border-left: none;
-    margin: 0;
+    display: block;
+    float: left;
+    margin: 0 1px 0 0;
     padding: 0;
+   	border: 0;
   }
 
   #primary a
   {
-    background: #6DA6E2 url(images/tabs.png) repeat-x;
-    color: #FFF;
-    font-weight: bold;
     display: block;
-    float: left;
-    padding: 5px 14px 5px 14px;
-    margin: 0 1px 0 0;
-    border: solid #6191C5 1px;
-    border-width: 1px 1px 0 1px;
-  }
-
-  #primary a.menu-1-1-2  /* wiki */ 
-   {
-   background: url(images/wiki.png) repeat-x;
-   font-weight: bold;
-    display: block;
-    float: left;
-    padding: 5px 14px 5px 14px;
-    margin: 0 1px 0 0;
-    border: solid #963a3a 1px;
-    border-width: 1px 1px 0 1px;
-    }
-
-  #primary a.menu-1-1-2-active /* wiki active */
-
-  {
-   background: url(images/wiki.png) repeat-x;
-   font-weight: bold;
-    display: block;
-    float: left;
-    padding: 5px 14px 5px 14px;
-    margin: 0 1px 0 0;
-    border: solid #963a3a 1px;
-    border-width: 1px 1px 0 1px;
-    }
-
-  #primary a.menu-1-3-2  /* blog tab */
-   {
-   background: url(images/blogtab.png) repeat-x;
-   font-weight: bold;
-    display: block;
-    float: left;
-    padding: 5px 14px 5px 14px;
-    margin: 0 1px 0 0;
-    border: solid #963a3a 1px;
-    border-width: 1px 1px 0 1px;
-    }
-
-  #primary a.menu-1-3-2-active /* blog tab	active */
-
-  {
-   background: url(images/blogtab.png) repeat-x;
-   font-weight: bold;
-    display: block;
-    float: left;
-    padding: 5px 14px 5px 14px;
-    margin: 0 1px 0 0;
-    border: solid #963a3a 1px;
-    border-width: 1px 1px 0 1px;
-    }
-
-   #primary a.menu-1-4-2  /* chatroom tab */
-   {
-   background: url(images/chatroomtabs.png) repeat-x;
-   font-weight: bold;
-    display: block;
-    float: left;
-    padding: 5px 14px 5px 14px;
-    margin: 0 1px 0 0;
-    border: solid #FFE42D 1px;
-    border-width: 1px 1px 0 1px;
-    }
-
-   #primary a.menu-1-4-2-active  /* chatroom tab */
-   {
-   background: url(images/chatroomtabs.png) repeat-x;
-   font-weight: bold;
-    display: block;
-    float: left;
-    padding: 5px 14px 5px 14px;
-    margin: 0 1px 0 0;
-    border: solid #FFE42D 1px;
-    border-width: 1px 1px 0 1px;
-    }
-
-
-
-
-   #primary a.menu-1-5-2  /* socialbookmark tab */
-   {
-   background: url(images/socialbookmark.png) repeat-x;
-   font-weight: bold;
-    display: block;
-    float: left;
-    padding: 5px 14px 5px 14px;
-    margin: 0 1px 0 0;
-    border: solid #43C71b 1px;
-    border-width: 1px 1px 0 1px;
-    }
-
-    #primary a.menu-1-5-2-active /* blog tab      active */
-
-  {
-   background: url(images/socialbookmark.png) repeat-x;
-   font-weight: bold;
-    display: block;
-    float: left;
-    padding: 5px 14px 5px 14px;
-    margin: 0 1px 0 0;
-    border: solid #43C71b 1px;
-    border-width: 1px 1px 0 1px;
-    }
-
-#primary a.menu-1-6-2  /* howto */
-   {
-   background: url(images/how-to.png) repeat-x;
-   font-weight: bold;
-    display: block;
-    float: left;
-    padding: 5px 14px 5px 14px;
-    margin: 0 1px 0 0;
-    border: solid #8e8989 1px;
-    border-width: 1px 1px 0 1px;
-    }
-
-   #primary a.menu-1-6-2-active  /* howto */
-   {
-   background: url(images/how-to.png) repeat-x;
-   font-weight: bold;
-    display: block;
-    float: left;
-    padding: 5px 14px 5px 14px;
-    margin: 0 1px 0 0;
-    border: solid #8e8989 1px;
-    border-width: 1px 1px 0 1px;
-    }
- 
-
-  #primary a
-  {
-    background-position: 0% 0;
-  }
-
-  #primary a:hover
-  {
-    background-position: 0% -42px;
+    -webkit-border-top-left-radius : 5px;
+    -webkit-border-top-right-radius : 5px;
+    -moz-border-radius-topleft : 5px;
+    -moz-border-radius-topright : 5px;
+    border-bottom-style: solid;
+    border-bottom-width: 2px;
+    padding: 7px 13px 4px 14px;
     text-decoration: none;
+    color: white;
   }
+  
+  #primary a:hover {color: #222;}
 
-  #primary a.active
-  {
-    background-position: 0% -84px;
-  }
+	#primary a.menu-1-1-2 { /* wiki */ 
+		background:#d24444;
+    	border-bottom-color: #af3b3b;
+	}
+	#primary a.menu-1-1-2-active { /* wiki active */ 
+		background:#d24444;
+    	border-bottom-color: #d24444;
+	}
+	#primary a.menu-1-2-2 { /* forums */ 
+		background:#609ad8;
+    	border-bottom-color: #5281b4;
+	}
+	#primary a.menu-1-2-2-active { /* forums active */ 
+		background:#609ad8;
+    	border-bottom-color: #609ad8;
+	}
+	#primary a.menu-1-3-2 { /* blog tab */ 
+		background:#d57bba;
+    	border-bottom-color: #b1689b;
+	}
+	#primary a.menu-1-3-2-active { /* blog tab active */ 
+		background:#d57bba;
+    	border-bottom-color: #d57bba;
+	}
+	#primary a.menu-1-4-2 { /* chatroom tab */ 
+		background:#e3af27;
+    	border-bottom-color: #bd9223;
+	}
+	#primary a.menu-1-4-2-active { /* chatroom tab */ 
+		background:#e3af27;
+    	border-bottom-color: #e3af27;
+	}
+	#primary a.menu-1-5-2 { /* socialbookmark tab */ 
+		background:#43c71b;
+    	border-bottom-color: #3aa61a;
+	}
+	#primary a.menu-1-5-2-active { /* socialbookmark tab active */ 
+		background:#43c71b;
+    	border-bottom-color: #43c71b;
+	}
+	#primary a.menu-1-6-2 { /* howto */ 
+		background:#57bec7;
+    	border-bottom-color: #4a9fa6;
+	}
+	#primary a.menu-1-6-2-active { /* howto */ 
+		background:#57bec7;
+    	border-bottom-color: #57bec7;
+	}
 
 
+/*
   #secondary
   {
     padding-left: 20px;
-    background: #6DA6E2; /*#347FD2;*/
+    background: #6DA6E2; 
     border-bottom: solid #2763A5 4px;
   }
 
  #blogsecondary
   {
     padding-left: 20px;
-    background: #D57BBA; /*#347FD2;*/
+    background: #D57BBA;
     border-bottom:4px solid #2763A5;
   }
 
@@ -590,6 +356,7 @@ font-size: 270%;
   {
     font-weight: bold;
   }
+*/
 
 /*
  * LINK STYLES
@@ -598,11 +365,6 @@ font-size: 270%;
   ul.links
   {
     text-align: left;
-  }
-
-  ul.links li
-  {
-    border-left: 1px solid #9cf;
   }
 
   .taxonomy
@@ -675,9 +437,9 @@ font-size: 270%;
 
   #search .form-text, #user-login-form .form-text
   {
-    color: #444;
-    border: 1px solid #6191C5;
-    padding: 2px;
+    color: #777;
+    border: 1px solid #999;
+    padding: 3px;
   }
 
   .form-submit, .button
@@ -690,10 +452,20 @@ font-size: 270%;
   #user-login-form .button,
   #user-login-form .form-submit
   {
-    background-color: #68A0D9;
-    color: #fff;
-    font-weight: bold;
-    border: 1px solid #4070A1;
+  	color: #666;
+    background-color: #fff;
+    border: 1px solid #aaa;
+	cursor: pointer;
+	padding: 3px 5px;
+  	-webkit-border-radius : 5px;
+  }
+
+  #search .button:hover,
+  #search .form-submit:hover,
+  #user-login-form .button:hover,
+  #user-login-form .form-submit:hover
+  {
+    border: 1px solid #666;		
   }
 
   #user-login-form
@@ -808,7 +580,6 @@ font-size: 270%;
   {
     margin-bottom: 0;
     padding: 5px 5px 5px 30px;
-    font-family: Verdana, "Bitstream Vera Sans", Arial, Helvetica, sans-serif;
     font-size: 122%;
     color: #fff;
     border-width: 0 2px 2px 2px;
@@ -856,7 +627,6 @@ font-size: 270%;
   {
     color: #2266AB;
     font-weight: normal;
-    font-family: "Trebuchet MS", "Bitstream Vera Sans", Verdana, Arial, Helvetica, sans-serif;
     margin-bottom: 3px;
     margin-top: 0;
   }
@@ -879,7 +649,6 @@ font-size: 270%;
   {
     color: #FFC600;
     font-weight: bold;
-    font-family: "Trebuchet MS", "Bitstream Vera Sans", Verdana, Arial, Helvetica, sans-serif;
   }
 
   .comment .links
@@ -954,7 +723,7 @@ font-size: 270%;
 
   #forum td
   {
-  border: 5px solid #FFFFFF;
+  border: 1px solid #FFFFFF;
   }
 
   #forum-topic th
@@ -972,8 +741,39 @@ font-size: 270%;
   ul.forumlinks
   {
   height: 30px;
+
+  }
+  
+  #forum li {
+  	padding: 0;
   }
 
+
+ #forum table th {
+ 	background: #609ad8; 
+ }
+ 
+ .forum-top-links ul li a {
+ 	border: 0;
+ }
+.forum-top-links ul li a {
+  	font-size: 0.8em;
+  	font-weight: bold;
+  	-moz-border-radius: 5px;
+  	-webkit-border-radius: 5px;
+    margin: 0;
+    padding: 5px 8px;
+    border-width: 0;
+    text-decoration: none;
+    color: #777;
+    background: #609ad8;
+	font-weight: bold;
+}
+
+.forum-top-links ul li a:hover {
+	font-weight: bold;
+    padding: 5px 8px;
+}
  
 
   
@@ -1038,7 +838,6 @@ font-size: 270%;
     color: #555;
     font-size: 129%;
     font-weight: normal;
-    font-family: Verdana, Tahoma, Arial, Helvetica, "Bitstream Vera Sans", sans-serif;
     line-height: 1.4em;
   }
 
@@ -1060,26 +859,8 @@ font-size: 270%;
     border-bottom: solid #ddd 1px;
     padding-bottom: 15px;
     margin: 0 0 1.5em 0;
-    background-color:#e2e6e7;
   }
 
-/*  #blog-sidebar-left .block
-  {
-    border-bottom: solid #ddd 1px;
-    padding-bottom: 15px;
-    margin: 0 0 1.5em 0;
-    background-color:#e2e6e7;
-  } */
-  
-/*  #blog-sidebar-right .block
-  {
-    border-bottom: solid #ddd 1px;
-    padding-bottom: 15px;
-    margin: 0 0 1.5em 0;
-    background-color:#e2e6e7;
-  } */
-  
- 
   
   #sidebar-left .block
   {

@@ -2,49 +2,45 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="<?php print $language ?>" xml:lang="<?php print $language ?>">
 
 <head>
-  <title><?php print $head_title; ?></title>
-  <?php print $head; ?>
-  <?php print $styles; ?>
+<title><?php print $head_title; ?></title>
+<?php print $head; ?>
+<?php print $styles; ?>
   <!--[if IE]>
     <link rel="stylesheet" href="<?php print $base_path . $directory ?>/ie.css" type="text/css">
-    <?php if ($subtheme_directory && file_exists($subtheme_directory .'/ie.css')): ?>
+  <?php if ($subtheme_directory && file_exists($subtheme_directory .'/ie.css')): ?>
       <link rel="stylesheet" href="<?php print $base_path . $subtheme_directory ?>/ie.css" type="text/css">
-    <?php endif; ?>
+  <?php endif; ?>
   <![endif]-->
   <?php print $scripts; ?>
 </head>
 
-<?php /* different classes allow for separate theming of the home page */ ?>
 <body class="<?php print $body_classes; ?>">
   <div id="page">
     <div id="header">
-
-      <div id="skip-nav"><a href="#content"><?php print t('Skip to Main Content'); ?></a></div>
-
+<div id="skip-nav"><a href="#content"><?php print t('Skip to Main Content'); ?></a></div>
       <div id="logo-title">
-
-        <?php print $search_box; ?>
-        <?php if (!empty($logo)): ?>
+<?php print $search_box; ?>
+<?php if (!empty($logo)): ?>
           <a href="<?php print $base_path; ?>" title="<?php print t('Home'); ?>" rel="home">
             <img src="<?php print $logo; ?>" alt="<?php print t('Home'); ?>" id="logo" />
           </a>
-        <?php endif; ?>
+<?php endif; ?>
 
-        <div id="name-and-slogan">
+     <div id="name-and-slogan">
 
         <?php if (!empty($site_name)): ?>
           <div id='site-name'><strong>
             <a href="<?php print $base_path ?>" title="<?php print t('Home'); ?>" rel="home">
-              <?php print $site_name; ?>
+	<?php print $site_name; ?>
             </a>
           </strong></div>
-        <?php endif; ?>
+	    <?php endif; ?>
 
-        <?php if (!empty($site_slogan)): ?>
+	    <?php if (!empty($site_slogan)): ?>
           <div id='site-slogan'>
             <?php print $site_slogan; ?>
           </div>
-        <?php endif; ?>
+	  <?php endif; ?>
 
         </div> <!-- /name-and-slogan -->
 
@@ -53,31 +49,29 @@
       <div id="navigation" class="menu<?php if ($primary_links) { print " withprimary"; } if ($secondary_links) { print " withsecondary"; } ?> ">
         <?php if (!empty($primary_links)): ?>
           <div id="primary" class="clear-block">
-            <?php print theme('links', $primary_links); ?>
+	<?php print theme('links', $primary_links); ?>
           </div>
-        <?php endif; ?>
+	  <?php endif; ?>
 
-        <?php if (!empty($secondary_links)): ?>
+	  <?php if (!empty($secondary_links)): ?>
           <div id="secondary" class="clear-block">
-            <?php print theme('links', $secondary_links); ?>
+	  <?php print theme('links', $secondary_links); ?>
           </div>
-        <?php endif; ?>
-      </div> <!-- /navigation -->
+	  <?php endif; ?>
+      </div>
+      
+   		<div class="smc_toolbar">
+ 			<a href="<?php print url('logout');?>">Logout</a>
+			<?php if (!empty($tabs)): ?><div class="tabs"><?php print $tabs; ?></div><?php endif; ?>
+   		</div>
+	<?php if (!empty($header)): ?>
+	<div id="header-region">
+      <?php print $header; ?>
+	</div> <!-- /header-region -->
+	<?php endif; ?>
 
-      <?php if (!empty($header) || !empty($breadcrumb)): ?>
-        <div id="header-region">
-          <?php print $breadcrumb; ?>
-   <!-- TRYING OUT A PAGER ON TOP -->
-  
-          
-   <?php print $header; ?>
-        </div> <!-- /header-region -->
-      <?php endif; ?>
-
-    </div> <!-- /header -->
-
+    </div> <!-- /header -->   
     <div id="container" class="clear-block">
-
       <?php if (!empty($sidebar_left)): ?>
         <div id="sidebar-left" class="column sidebar">
           <?php print $sidebar_left; ?>
@@ -93,10 +87,7 @@
         <?php endif; ?>
         <div id="content">
           <?php if (!empty($title)): ?>
-            <h1 class="title"><?php print $title; ?></h1>
-          <?php endif; ?>
-          <?php if (!empty($tabs)): ?>
-            <div class="tabs"><?php print $tabs; ?></div>
+            <h2 class="title"><?php print $title; ?></h2>
           <?php endif; ?>
           <?php print $help; ?>
           <?php print $messages; ?>

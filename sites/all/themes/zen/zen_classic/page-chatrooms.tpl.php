@@ -19,7 +19,6 @@
 <body class="<?php print $body_classes; ?>">
   <div id="page">
     <div id="header">
-<div id="chatroomtoolbar"><b><a href="<?php print url("chatrooms");?>" id="toolbarblog">Chatrooms</a></b>|<a href="<?php print url("node/add/chatroom");?>" id="toolbaraddblog">Post New Chatroom</a>||<a href="<?php print url("user");?>" id="toolbarmystuff">My Stuff >></a></div>
 
 <div id="skip-nav"><a href="#content"><?php print t('Skip to Main Content'); ?></a></div>
 
@@ -65,10 +64,14 @@
           </div>
 	  <?php endif; ?>
       </div> <!-- /navigation -->
+		<div class="smc_toolbar" id="chatroomtoolbar">
+			<a href="<?php print url("node/add/chatroom");?>" id="toolbaraddblog">Post New Chatroom</a> | 
+			<a href="<?php print url('logout');?>">Logout</a>
+			<?php if (!empty($tabs)): ?><div class="tabs"><?php print $tabs; ?></div><?php endif; ?>
+		</div>
 
-      <?php if (!empty($header) || !empty($breadcrumb)): ?>
+      <?php if (!empty($header)): ?>
         <div id="header-region">
-      <?php print $breadcrumb; ?>
       <?php print $header; ?>
         </div> <!-- /header-region -->
 	<?php endif; ?>
@@ -92,10 +95,7 @@
       <?php endif; ?>
         <div id="content">
 	<?php if (!empty($title)): ?>
-	<h1 class="chatroomtitle"><?php print $title; ?></h1>
-	<?php endif; ?>
-	<?php if (!empty($tabs)): ?>
-	<div class="tabs"><?php print $tabs; ?></div>
+	<h2 class="chatroomtitle"><?php print $title; ?></h2>
 	<?php endif; ?>
 	<?php print $help; ?>
 	<?php print $messages; ?>

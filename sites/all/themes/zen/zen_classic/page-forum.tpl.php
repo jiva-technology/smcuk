@@ -14,18 +14,11 @@
   <?php print $scripts; ?>
 </head>
 
-<?php /* different classes allow for separate theming of the home page */ ?>
-
 <body class="<?php print $body_classes; ?>">
   <div id="page">
     <div id="header">
-
-<div id="forumtoolbar"><b><a href="<?php print url("forum");?>" id="toolbarforum">Forums</a></b>|<a href="<?php print url("forum/forumtracker");?>" id="toolbarforumunread">All Unread</a>|<a href="<?php print url("readpath"); ?>" id="toobarforumfollowed">My Followed</a>||<a href="<?php print url("user");?>" id="toolbarforummystuff">My Stuff >></a></div>
-
 <div id="skip-nav"><a href="#content"><?php print t('Skip to Main Content'); ?></a></div>
-
       <div id="logo-title">
-
 <?php print $search_box; ?>
 <?php if (!empty($logo)): ?>
           <a href="<?php print $base_path; ?>" title="<?php print t('Home'); ?>" rel="home">
@@ -33,7 +26,7 @@
           </a>
 <?php endif; ?>
 
-        <div id="name-and-slogan">
+     <div id="name-and-slogan">
 
         <?php if (!empty($site_name)): ?>
           <div id='site-name'><strong>
@@ -65,19 +58,22 @@
 	  <?php print theme('links', $secondary_links); ?>
           </div>
 	  <?php endif; ?>
-      </div> <!-- /navigation -->
-
-      <?php if (!empty($header) || !empty($breadcrumb)): ?>
-        <div id="header-region">
-      <?php print $breadcrumb; ?>
+      </div>
+      
+   		<div class="smc_toolbar" id="forumtoolbar">
+			<a href="<?php print url("forum/forumtracker");?>" id="toolbarforumunread">All Unread</a> | 
+			<a href="<?php print url("readpath"); ?>" id="toobarforumfollowed">My Followed</a> | 
+			<a href="<?php print url('logout');?>">Logout</a>
+			<?php if (!empty($tabs)): ?><div class="tabs"><?php print $tabs; ?></div><?php endif; ?>
+   		</div>
+	<?php if (!empty($header)): ?>
+	<div id="header-region">
       <?php print $header; ?>
-        </div> <!-- /header-region -->
+	</div> <!-- /header-region -->
 	<?php endif; ?>
 
-    </div> <!-- /header -->
-
+    </div> <!-- /header -->   
     <div id="container" class="clear-block">
-
     <?php if (!empty($sidebar_left)): ?>
         <div id="sidebar-left" class="column sidebar">
     <?php print $sidebar_left; ?>
@@ -93,10 +89,7 @@
       <?php endif; ?>
         <div id="content">
 	<?php if (!empty($title)): ?>
-	<h1 class="title"><?php print $title; ?></h1>
-	<?php endif; ?>
-	<?php if (!empty($tabs)): ?>
-	<div class="tabs"><?php print $tabs; ?></div>
+	<h2 class="title"><?php print $title; ?></h2>
 	<?php endif; ?>
 	<?php print $help; ?>
 	<?php print $messages; ?>

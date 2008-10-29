@@ -38,8 +38,8 @@
       <?php if ($mission) { ?><div id="mission"><?php print $mission ?></div><?php } ?>
       <div id="main">
         <?php print $breadcrumb ?>
-        <h1 class="title"><?php print $title ?></h1>
         <div class="tabs"><?php print $tabs ?></div>
+        <h1 class="title"><?php print $title ?></h1>
         <?php print $help ?>
         <?php print $messages ?>
         <?php print $content; ?>

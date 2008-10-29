@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="<?php print $language; ?>" xml:lang="<?php print $language; ?>">
 
 <head>
-  <title><?php print $head_title; ?></title>
+  <title><?php print $head_title; ?>!!!!</title>
   <?php print $head; ?>
   <?php print $styles; ?>
   <!--[if IE]>
@@ -75,12 +75,9 @@
           <div id="content-header">
             <?php print $breadcrumb; ?>
             <?php if ($title): ?>
-              <h1 class="title"><?php print $title; ?></h1>
+              <h2 class="title"><?php print $title; ?></h2>
             <?php endif; ?>
             <?php print $messages; ?>
-            <?php if ($tabs): ?>
-              <div class="tabs"><?php print $tabs; ?></div>
-            <?php endif; ?>
             <?php print $help; ?>
           </div> <!-- /#content-header -->
         <?php endif; ?>

@@ -19,9 +19,7 @@
 <body class="<?php print $body_classes; ?>">
   <div id="page">
     <div id="header">
-<div id="wikitoolbar"><b><a href="<?php print url("wiki/main-page");?>" id="toolbarforum">Wiki</a></b>|<a href="<?php print url("wikichanges");?>" id="toolbarforumunread">Recent Wiki Changes</a>|||<a href="<?php print url("user");?>" id="toolbarwikimystuff">My Stuff >></a></div>
-
-<div id="skip-nav"><a href="#content"><?php print t('Skip to Main Content'); ?></a></div>
+	<div id="skip-nav"><a href="#content"><?php print t('Skip to Main Content'); ?></a></div>
 
       <div id="logo-title">
 
@@ -65,10 +63,15 @@
           </div>
 	  <?php endif; ?>
       </div> <!-- /navigation -->
+	<div class="smc_toolbar" id="wikitoolbar">
+			<a href="<?php print url("wikichanges");?>" id="toolbarforumunread">Recent Wiki Changes</a> | 
+			<a href="<?php print url("wiki_index");?>" id="toolbarwikiinsdex">Wiki Page Index</a> | 
+		<a href="<?php print url('logout');?>">Logout</a>
+		<?php if (!empty($tabs)): ?><div class="tabs"><?php print $tabs; ?></div><?php endif; ?>
+	</div>
 
-      <?php if (!empty($header) || !empty($breadcrumb)): ?>
+      <?php if (!empty($header)): ?>
         <div id="header-region">
-      <?php print $breadcrumb; ?>
       <?php print $header; ?>
         </div> <!-- /header-region -->
 	<?php endif; ?>
@@ -92,10 +95,7 @@
       <?php endif; ?>
         <div id="content">
 	<?php if (!empty($title)): ?>
-	<h1 class="wikititle"><?php print $title; ?></h1>
-	<?php endif; ?>
-	<?php if (!empty($tabs)): ?>
-	<div class="tabs"><?php print $tabs; ?></div>
+	<h2 class="wikititle"><?php print $title; ?></h2>
 	<?php endif; ?>
 	<?php print $help; ?>
 	<?php print $messages; ?>

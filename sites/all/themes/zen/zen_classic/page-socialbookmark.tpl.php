@@ -19,9 +19,6 @@
 <body class="<?php print $body_classes; ?>">
   <div id="page">
     <div id="header">
-<div id="socialbookmarktoolbar"><b><a href="<?php print url("links");?>" id="toolbarsocialbookmarks">Social bookmarks</a></b>|<a href="<?php print url("node/add/userlink");?>" id="toolbaraddsocialbookmark">Create</a>|<a href="<?php print url("tagadelic/chunk/5");?>" id="toolbarsocialbookmarktagsall">All Tags</a>||<a href="<?php print url("user");?>" id="toolbarmystuff">My Stuff >></a></div>
-
-
 <div id="skip-nav"><a href="#content"><?php print t('Skip to Main Content'); ?></a></div>
 
       <div id="logo-title">
@@ -66,10 +63,15 @@
           </div>
 	  <?php endif; ?>
       </div> <!-- /navigation -->
+	<div class="smc_toolbar" id="socialbookmarktoolbar">
+		<a href="<?php print url("node/add/userlink");?>" id="toolbaraddsocialbookmark">Create</a> | 
+		<a href="<?php print url("tagadelic/chunk/5");?>" id="toolbarsocialbookmarktagsall">All Tags</a> | 
+		<a href="<?php print url('logout');?>">Logout</a>
+		<?php if (!empty($tabs)): ?><div class="tabs"><?php print $tabs; ?></div><?php endif; ?>
+	</div>
 
-      <?php if (!empty($header) || !empty($breadcrumb)): ?>
+      <?php if (!empty($header)): ?>
         <div id="header-region">
-      <?php print $breadcrumb; ?>
       <?php print $header; ?>
         </div> <!-- /header-region -->
 	<?php endif; ?>
@@ -93,10 +95,7 @@
       <?php endif; ?>
         <div id="content">
 	<?php if (!empty($title)): ?>
-	<h1 class="socialbookmarktitle"><?php print $title; ?></h1>
-	<?php endif; ?>
-	<?php if (!empty($tabs)): ?>
-	<div class="tabs"><?php print $tabs; ?></div>
+	<h2 class="socialbookmarktitle"><?php print $title; ?></h2>
 	<?php endif; ?>
 	<?php print $help; ?>
 	<?php print $messages; ?>

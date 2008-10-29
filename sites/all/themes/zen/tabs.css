@@ -12,62 +12,55 @@
 
   div.tabs
   {
-    margin: 0 0 5px 0;
+    float: right;
+    margin: -5px 33px 0 33px;
   }
 
   ul.primary
   {
     margin: 0;
-    padding: 0 0 0 10px;
+    padding: 0;
     border-width: 0;
     list-style: none;
     white-space: nowrap;
     line-height: normal;
-    background: url(images/tab-bar.png) repeat-x left bottom;
   }
 
   ul.primary li
   {
     float: left;
-    margin: 0;
+    margin: 0 0 0 3px;
     padding: 0;
   }
 
   ul.primary li a
   {
+  	font-size: 0.8em;
+  	font-weight: bold;
+  	-moz-border-radius: 5px;
+  	-webkit-border-radius: 5px;
     display: block;
-    height: 24px;
     margin: 0;
-    padding: 0 0 0 5px; /* width of tab-left.png */
+    padding: 0;
     border-width: 0;
-    font-weight: bold;
     text-decoration: none;
     color: #777;
-    background-color: transparent;
-    background: url(images/tab-left.png) no-repeat left -38px;
+    background: white;
   }
 
   ul.primary li a .tab
   {
     display: block;
-    height: 20px; /* 24px (parent) - 4px (padding) */
     margin: 0;
-    padding: 4px 13px 0 6px;
+    padding: 2px 6px;
     border-width: 0;
     line-height: 20px;
-    background: url(images/tab-right.png) no-repeat right -38px;
   }
 
   ul.primary li a:hover
   {
     border-width: 0;
-    background-color: transparent;
-    background: url(images/tab-left.png) no-repeat left -76px;
-  }
-
-  ul.primary li a:hover .tab
-  {
-    background: url(images/tab-right.png) no-repeat right -76px;
+    background-color: #ccc;
   }
 
   ul.primary li.active a,
@@ -75,14 +68,11 @@
   {
     border-width: 0;
     color: #000;
-    background-color: transparent;
-    background: url(images/tab-left.png) no-repeat left 0;
   }
 
   ul.primary li.active a .tab,
   ul.primary li.active a:hover .tab
   {
-    background: url(images/tab-right.png) no-repeat right 0;
   }
 
   ul.secondary
@@ -92,7 +82,6 @@
     border-bottom: 1px solid #c0c0c0;
     list-style: none;
     white-space: nowrap;
-    background: url(images/tab-secondary-bg.png) repeat-x left bottom;
   }
 
   ul.secondary li

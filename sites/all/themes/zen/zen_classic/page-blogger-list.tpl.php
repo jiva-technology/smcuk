@@ -19,7 +19,6 @@
 <body class="<?php print $body_classes; ?>">
   <div id="page">
     <div id="header">
-<div id="blogtoolbar"><b><a href="<?php print url("blog");?>" id="toolbarblog">Blog</a></b>|<a href="<?php print url("node/add/blog");?>" id="toolbaraddblog">Create</a>|<a href="manage">Manage</a>|<a href="<?php print url("myblogcomments");?>" id="toolbarcomments">Comments</a>||<a href="<?php print url("user");?>" id="toolbarmystuff">My Stuff >></a></div>
 
 <div id="skip-nav"><a href="#content"><?php print t('Skip to Main Content'); ?></a></div>
 
@@ -58,6 +57,13 @@
 	<?php print theme('links', $primary_links); ?>
           </div>
 	  <?php endif; ?>
+	<div class="smc_toolbar" id="blogtoolbar">
+		<a href="<?php print url("node/add/blog");?>" id="toolbaraddblog">Create</a> | 
+		<a href="manage">Manage</a> | 
+		<a href="<?php print url("myblogcomments");?>" id="toolbarcomments">Comments</a> | 
+		<a href="<?php print url('logout');?>">Logout</a>
+		<?php if (!empty($tabs)): ?><div class="tabs"><?php print $tabs; ?></div><?php endif; ?>
+	</div>
 
 	  <?php if (!empty($secondary_links)): ?>
           <div id="blogsecondary" class="clear-block">
@@ -66,9 +72,8 @@
 	  <?php endif; ?>
       </div> <!-- /navigation -->
 
-      <?php if (!empty($header) || !empty($breadcrumb)): ?>
+      <?php if (!empty($header)): ?>
         <div id="header-region">
-      <?php print $breadcrumb; ?>
       <?php print $header; ?>
         </div> <!-- /header-region -->
 	<?php endif; ?>
@@ -92,10 +97,7 @@
       <?php endif; ?>
         <div id="content">
 	<?php if (!empty($title)): ?>
-	<h1 class="blogtitle"><?php print $title; ?></h1>
-	<?php endif; ?>
-	<?php if (!empty($tabs)): ?>
-	<div class="tabs"><?php print $tabs; ?></div>
+	<h2 class="blogtitle"><?php print $title; ?></h2>
 	<?php endif; ?>
 	<?php print $help; ?>
 	<?php print $messages; ?>
